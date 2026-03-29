@@ -8,39 +8,38 @@ The system works by first reading CCTV footage and breaking it into frames. Thes
 ## Setup
 
 ### 1. Clone the Repository
+```
 git clone https://github.com/Sanika984/AI_based_cctv_video_analytics.git
 cd AI_based_cctv_video_analytics
+```
 
 ### 2. Install uv (if not already installed)
+```
 curl -LsSf https://astral.sh/uv/install.sh | sh
+```
 
 ### 3. Create Virtual Environment
+```
 uv venv
+```
 
-### 4. Activate Virtual Environment
-# Mac / Linux
+### 4. Activate Virtual Environment (Mac / Linux)
+```
 source .venv/bin/activate
+```
 
-# Windows
+### Windows
+```
 .venv\Scripts\activate
+```
 
 ### 5. Install Dependencies
+```
 uv sync
+```
 
 ### 6. Run the App
+```
 streamlit run frontend/streamlit_app.py
 ```
-
 ---
-
-## Also Add a .gitignore
-
-You don't want to push your venv or model weights to GitHub. Create a `.gitignore` file:
-```
-.venv/
-__pycache__/
-*.pt
-*.mp4
-*.pyc
-.DS_Store
-data/logs/*
