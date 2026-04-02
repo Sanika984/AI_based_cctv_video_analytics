@@ -1,0 +1,133 @@
+Table cameras {
+  camera_id varchar [primary key]
+  name      text    [not null]
+  location  text    [not null]
+  source    text    [not null]
+  status    text    [not null]
+  created_at datetime [not null]
+}
+
+Table camera_metadata {
+  id        varchar [primary key]
+  camera_id varchar [unique, not null]
+  floor     integer
+  description text
+}
+
+Table camera_modules {
+  id          varchar [primary key]
+  camera_id   varchar [not null]
+  module_name text    [not null]
+}
+
+Table camera_features {
+  id           varchar [primary key]
+  camera_id    varchar [not null]
+  feature_name text    [not null]
+}
+
+Ref: camera_metadata.camera_id - cameras.camera_id   // one to one
+Ref: camera_modules.camera_id > cameras.camera_id    // many to one
+Ref: camera_features.camera_id > cameras.camera_id   // many to one
+
+Table person_events {
+  event_id    varchar  [primary key]
+  camera_id   varchar  [not null]
+  person_id   integer  [not null]
+  entry_time  datetime [not null]
+  exit_time   datetime            // null if person still in frame
+}
+
+Table line_crossing_events {
+  event_id      varchar  [primary key]
+  camera_id     varchar  [not null]
+  person_id     integer  [not null]
+  entry_time    datetime             // when crossed line going in
+  exit_time     datetime             // when crossed line going out
+  snapshot_path text                 // snapshot of the crossing
+}
+
+
+Table alerts {
+  alert_id        varchar  [primary key]
+  camera_id       varchar  [not null]
+  alert_type      text     [not null]   // blacklist/loitering/crowd/weapon/fire
+  severity        text     [not null]   // low/medium/high/critical
+  status          text     [not null]   // open/acknowledged/resolved
+  reference_id    text                  // id of the record that triggered it                                     // vehicle log id, person event id etc
+  timestamp       datetime [not null]
+  acknowledged_by text
+  acknowledged_at datetime
+}
+
+
+Table vehicle_logs {
+  log_id           varchar  [primary key]
+  camera_id        varchar  [not null]
+  plate_number     text     [not null]
+  entry_time       datetime [not null]
+  exit_time        datetime            // null if still in parking
+  confidence_score real                // OCR confidence 0.0 to 1.0
+  is_blacklisted   boolean  [not null, default: false]
+}
+
+Table blacklisted_vehicles {
+  id               varchar  [primary key]
+  plate_number     text     [not null, unique]
+  reason           text                
+  added_by         text              
+  added_at         datetime [not null]
+  is_active        boolean  [not null, default: true]
+}
+
+Ref: vehicle_logs.camera_id > cameras.camera_id
+
+Table footfall_logs {
+  log_id           varchar  [primary key]
+  camera_id        varchar  [not null]
+  count            integer  [not null]
+  timestamp        datetime [not null]
+}
+
+Table heatmap_points {
+  id               varchar  [primary key]
+  camera_id        varchar  [not null]
+  x_normalized     real     [not null]
+  y_normalized     real     [not null]
+  timestamp        datetime [not null]
+}
+
+Table video_recordings {
+  recording_id     varchar  [primary key]
+  camera_id        varchar  [not null]
+  file_path        text     [not null]
+  start_time       datetime [not null]
+  end_time         datetime
+  file_size_mb     real
+  status           text     [not null]
+}
+
+Table users {
+  user_id          varchar  [primary key]
+  username         text     [not null, unique]
+  password_hash    text     [not null]
+  role             text     [not null]
+  last_login       datetime
+  created_at       datetime [not null]
+  is_active        boolean  [not null, default: true]
+}
+
+Table user_camera_access {
+  id               varchar  [primary key]
+  user_id          varchar  [not null]
+  camera_id        varchar  [not null]
+}
+
+Ref: person_events.camera_id > cameras.camera_id
+Ref: line_crossing_events.camera_id > cameras.camera_id
+Ref: footfall_logs.camera_id > cameras.camera_id
+Ref: heatmap_points.camera_id > cameras.camera_id
+Ref: video_recordings.camera_id > cameras.camera_id
+Ref: user_camera_access.user_id > users.user_id
+Ref: user_camera_access.camera_id > cameras.camera_id
+Ref: alerts.camera_id > cameras.camera_id
