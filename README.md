@@ -43,3 +43,15 @@ uv sync
 streamlit run frontend/streamlit_app.py
 ```
 ---
+
+### Modules 
+- Consumer analytics
+- Licence plate detection & logging
+- Security analytics
+
+### Features
+- Consumer analytics 
+    - in_out_count (live_occupancy, entry_trend, exit_trend, net_flow, peak_hours)
+    - dwell_time, zone_footfall, active_people,zone_popularity
+    - heatmap
+    - floor_footfall
