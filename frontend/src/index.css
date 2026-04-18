@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --font-space: "Space Grotesk", sans-serif;
+
+  --color-brand-bg: #020617;
+  --color-brand-accent: #4EDEA3;
+  --color-brand-active: #05183C;
+  --color-brand-muted: #91AAEB;
+  --color-brand-sub: #8F9FB7;
+  --color-brand-text: #DEE5FF;
+}
+
+body {
+  background-color: var(--color-brand-bg);
+  color: var(--color-brand-text);
+  font-family: var(--font-space);
+  margin: 0;
+  padding: 0;
+}

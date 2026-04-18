@@ -39,8 +39,20 @@ uv sync
 ```
 
 ### 6. Run the App
+
+#### Backend (FastAPI)
 ```
-streamlit run frontend/streamlit_app.py
+cd backend
+# To run the backend (depends on your server setup, usually uvicorn)
+uvicorn app.main:app --reload
+```
+
+#### Frontend (React + Vite)
+Open a new terminal window:
+```
+cd frontend
+npm install
+npm run dev
 ```
 ---
 
