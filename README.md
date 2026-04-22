@@ -39,7 +39,29 @@ uv sync
 ```
 
 ### 6. Run the App
+#### Backend (FastAPI)
 ```
-streamlit run frontend/streamlit_app.py
+cd backend
+uvicorn app.main:app --reload
+```
+
+#### Frontend (React + Vite)
+Open a new terminal window:
+```
+cd frontend
+npm install
+npm run dev
 ```
 ---
+
+### Modules 
+- Consumer analytics
+- Licence plate detection & logging
+- Security analytics
+
+### Features
+- Consumer analytics 
+    - in_out_count (live_occupancy, entry_trend, exit_trend, net_flow, peak_hours)
+    - dwell_time, zone_footfall, active_people, zone_popularity
+    - heatmap
+    - floor_footfall
