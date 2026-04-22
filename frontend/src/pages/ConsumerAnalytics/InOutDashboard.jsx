@@ -1,18 +1,89 @@
-import React from 'react';
-import { Users, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getFootfall, getCameras } from '../../services/api';
+import { Users, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import FeedCard from '../../components/FeedCard';
 
 export default function InOutDashboard() {
+   const { data: footfalls, isLoading } = useQuery({
+      queryKey: ['footfall'],
+      queryFn: getFootfall,
+   });
+
+   const { data: cameras, isLoading: isLoadingCameras } = useQuery({
+      queryKey: ['cameras'],
+      queryFn: getCameras,
+   });
+
+   const [currentPage, setCurrentPage] = useState(0);
+
+   const filteredCameras = cameras?.filter(c => 
+      c.module === 'Consumer Analytics' && c.features?.['IN / OUT count'] === true
+   ) || [];
+   
+   const pageCount = Math.ceil(filteredCameras.length / 4);
+   const displayedCameras = filteredCameras.slice(currentPage * 4, (currentPage + 1) * 4);
+
+   // Derived mocked values based on API data
+   const getLiveOccupancy = () => {
+      if (!footfalls || footfalls.length === 0) return 0;
+      // Get the sum of the last 5 logs for an arbitrary live occupancy reading
+      return footfalls.slice(0, 5).reduce((acc, log) => acc + log.count, 0);
+   };
+
+   const getTotal = () => {
+      if (!footfalls || footfalls.length === 0) return 0;
+      return footfalls.reduce((acc, log) => acc + log.count, 0);
+   };
+
+   const liveOccupancy = getLiveOccupancy();
+   const totalIn = getTotal();
+   const totalOut = Math.floor(getTotal() * 0.72); // Mocking 72% out
+
    return (
       <div className="flex flex-col gap-6 w-full animate-in fade-in transition-all">
          {/* Top Row: Video Grid & Occupancy Stats */}
          <div className="flex flex-col xl:flex-row gap-6 w-full">
             {/* Left: Video Grid */}
-            <div className="grid grid-cols-2 gap-4 flex-[2] min-w-[632px] h-[400px]">
-               <FeedCard title="CAM-01: MAIN ENTRANCE" />
-               <FeedCard title="CAM-02: EXIT 01" />
-               <FeedCard title="CAM-03: WEST ENTRANCE" />
-               <FeedCard title="CAM-04: EXIT 02" />
+            <div className="flex flex-col gap-4 flex-[2] min-w-[632px]">
+               <div className="grid grid-cols-2 gap-4 h-[400px]">
+                  {isLoadingCameras ? (
+                     <div className="col-span-2 flex items-center justify-center h-full">
+                        <span className="text-[#91AAEB] font-inter">Loading cameras...</span>
+                     </div>
+                  ) : displayedCameras.length > 0 ? (
+                     displayedCameras.map(camera => (
+                        <FeedCard key={camera.camera_id} title={camera.name} />
+                     ))
+                  ) : (
+                     <div className="col-span-2 flex items-center justify-center h-full border border-dashed border-[rgba(43,70,128,0.3)] rounded-lg bg-[#06122D]">
+                        <span className="text-[#91AAEB] font-inter">No cameras configured for IN/OUT count.</span>
+                     </div>
+                  )}
+               </div>
+
+               {/* Pagination Controls */}
+               {pageCount > 1 && (
+                  <div className="flex justify-between items-center bg-[#06122D] p-3 rounded-lg border border-[rgba(43,70,128,0.1)]">
+                     <span className="text-[#91AAEB] font-inter text-[12px]">Showing page {currentPage + 1} of {pageCount}</span>
+                     <div className="flex gap-2">
+                        <button 
+                           onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                           disabled={currentPage === 0}
+                           className="flex items-center gap-1 px-3 py-1.5 bg-[#05183C] text-[#DEE5FF] rounded hover:bg-[#4EDEA3] hover:text-[#004A31] transition-colors disabled:opacity-50 disabled:hover:bg-[#05183C] disabled:hover:text-[#DEE5FF]"
+                        >
+                           <ChevronLeft size={14} /> <span className="text-[12px] font-medium">Prev</span>
+                        </button>
+                        <button 
+                           onClick={() => setCurrentPage(p => Math.min(pageCount - 1, p + 1))}
+                           disabled={currentPage >= pageCount - 1}
+                           className="flex items-center gap-1 px-3 py-1.5 bg-[#05183C] text-[#DEE5FF] rounded hover:bg-[#4EDEA3] hover:text-[#004A31] transition-colors disabled:opacity-50 disabled:hover:bg-[#05183C] disabled:hover:text-[#DEE5FF]"
+                        >
+                           <span className="text-[12px] font-medium">Next</span> <ChevronRight size={14} />
+                        </button>
+                     </div>
+                  </div>
+               )}
             </div>
 
             {/* Right: Stats & Chart */}
@@ -25,21 +96,25 @@ export default function InOutDashboard() {
                   </div>
 
                   <div className="flex items-end gap-3 pb-4 border-b border-[rgba(43,70,128,0.1)]">
-                     <span className="text-[#DEE5FF] font-space font-bold text-[48px] leading-none">342</span>
-                     <div className="bg-[#4EDEA3]/10 px-2 py-0.5 rounded-[12px] mb-2 border border-[#4EDEA3]/20">
-                        <span className="text-[#4EDEA3] font-inter font-medium text-[12px]">84% Capacity</span>
-                     </div>
+                     <span className="text-[#DEE5FF] font-space font-bold text-[48px] leading-none">
+                        {isLoading ? '...' : liveOccupancy}
+                     </span>
+                     {!isLoading && (
+                        <div className="bg-[#4EDEA3]/10 px-2 py-0.5 rounded-[12px] mb-2 border border-[#4EDEA3]/20">
+                           <span className="text-[#4EDEA3] font-inter font-medium text-[12px]">Normal Capacity</span>
+                        </div>
+                     )}
                   </div>
 
                   <div className="flex justify-between w-full pt-1">
                      <div className="flex flex-col gap-1 items-center">
                         <span className="text-[#91AAEB] font-inter text-[10px] uppercase">Total In</span>
-                        <span className="text-[#DEE5FF] font-space text-[18px]">1,240</span>
+                        <span className="text-[#DEE5FF] font-space text-[18px]">{isLoading ? '-' : totalIn.toLocaleString()}</span>
                      </div>
                      <div className="w-[1px] bg-[rgba(43,70,128,0.1)] h-full"></div>
                      <div className="flex flex-col gap-1 items-center">
                         <span className="text-[#91AAEB] font-inter text-[10px] uppercase">Total Out</span>
-                        <span className="text-[#DEE5FF] font-space text-[18px]">898</span>
+                        <span className="text-[#DEE5FF] font-space text-[18px]">{isLoading ? '-' : totalOut.toLocaleString()}</span>
                      </div>
                      <div className="w-[1px] bg-[rgba(43,70,128,0.1)] h-full"></div>
                      <div className="flex flex-col gap-1 items-center">

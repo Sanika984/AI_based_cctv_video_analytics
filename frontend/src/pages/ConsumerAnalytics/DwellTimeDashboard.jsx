@@ -1,19 +1,68 @@
-import React from 'react';
-import { Users, Clock } from 'lucide-react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getCameras } from '../../services/api';
+import { Users, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 import FeedCard from '../../components/FeedCard';
 
 export default function DwellTimeDashboard() {
+   const { data: cameras, isLoading: isLoadingCameras } = useQuery({
+      queryKey: ['cameras'],
+      queryFn: getCameras,
+   });
+
+   const [currentPage, setCurrentPage] = useState(0);
+
+   const filteredCameras = cameras?.filter(c => 
+      c.module === 'Consumer Analytics' && c.features?.['Dwell time'] === true
+   ) || [];
+   
+   const pageCount = Math.ceil(filteredCameras.length / 4);
+   const displayedCameras = filteredCameras.slice(currentPage * 4, (currentPage + 1) * 4);
    return (
       <div className="flex flex-col gap-6 w-full animate-in fade-in transition-all">
 
          {/* Top Row: Video Grid & Occupancy Stats */}
          <div className="flex flex-col xl:flex-row gap-6 w-full">
             {/* Left: Video Grid */}
-            <div className="grid grid-cols-2 gap-4 flex-[2] min-w-[632px] h-[400px]">
-               <FeedCard title="CAM-01: GROCERIES" />
-               <FeedCard title="CAM-02: MILK & DAIRY" />
-               <FeedCard title="CAM-03: ELECTRONICS" />
-               <FeedCard title="CAM-04: STATIONARY" />
+            <div className="flex flex-col gap-4 flex-[2] min-w-[632px]">
+               <div className="grid grid-cols-2 gap-4 h-[400px]">
+                  {isLoadingCameras ? (
+                     <div className="col-span-2 flex items-center justify-center h-full">
+                        <span className="text-[#91AAEB] font-inter">Loading cameras...</span>
+                     </div>
+                  ) : displayedCameras.length > 0 ? (
+                     displayedCameras.map(camera => (
+                        <FeedCard key={camera.camera_id} title={camera.name} />
+                     ))
+                  ) : (
+                     <div className="col-span-2 flex items-center justify-center h-full border border-dashed border-[rgba(43,70,128,0.3)] rounded-lg bg-[#06122D]">
+                        <span className="text-[#91AAEB] font-inter">No cameras configured for Dwell time.</span>
+                     </div>
+                  )}
+               </div>
+
+               {/* Pagination Controls */}
+               {pageCount > 1 && (
+                  <div className="flex justify-between items-center bg-[#06122D] p-3 rounded-lg border border-[rgba(43,70,128,0.1)]">
+                     <span className="text-[#91AAEB] font-inter text-[12px]">Showing page {currentPage + 1} of {pageCount}</span>
+                     <div className="flex gap-2">
+                        <button 
+                           onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                           disabled={currentPage === 0}
+                           className="flex items-center gap-1 px-3 py-1.5 bg-[#05183C] text-[#DEE5FF] rounded hover:bg-[#4EDEA3] hover:text-[#004A31] transition-colors disabled:opacity-50 disabled:hover:bg-[#05183C] disabled:hover:text-[#DEE5FF]"
+                        >
+                           <ChevronLeft size={14} /> <span className="text-[12px] font-medium">Prev</span>
+                        </button>
+                        <button 
+                           onClick={() => setCurrentPage(p => Math.min(pageCount - 1, p + 1))}
+                           disabled={currentPage >= pageCount - 1}
+                           className="flex items-center gap-1 px-3 py-1.5 bg-[#05183C] text-[#DEE5FF] rounded hover:bg-[#4EDEA3] hover:text-[#004A31] transition-colors disabled:opacity-50 disabled:hover:bg-[#05183C] disabled:hover:text-[#DEE5FF]"
+                        >
+                           <span className="text-[12px] font-medium">Next</span> <ChevronRight size={14} />
+                        </button>
+                     </div>
+                  </div>
+               )}
             </div>
 
             {/* Right: Stats & Chart */}

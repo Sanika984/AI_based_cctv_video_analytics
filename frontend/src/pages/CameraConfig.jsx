@@ -1,17 +1,37 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getCameras, addCamera, updateCamera, deleteCamera } from '../services/api';
 import { 
    Plus, Filter, Download, Activity, Wrench, WifiOff, MoreHorizontal, 
    ChevronLeft, ChevronRight, Info, Database, Cpu, Settings2, Link, 
-   VideoOff, ArrowLeftRight, Clock, Map, Check 
+   VideoOff, ArrowLeftRight, Clock, Map, Check, Flame, Crosshair, Edit2, Trash2 
 } from 'lucide-react';
 
 
 export default function CameraConfig() {
+   const queryClient = useQueryClient();
    const [isAdding, setIsAdding] = useState(false);
+   const [editingCamera, setEditingCamera] = useState(null);
 
-   if (isAdding) {
-      return <AddCameraForm onCancel={() => setIsAdding(false)} />;
+   const { data: cameras, isLoading, isError } = useQuery({
+      queryKey: ['cameras'],
+      queryFn: getCameras,
+   });
+
+   const deleteMutation = useMutation({
+      mutationFn: deleteCamera,
+      onSuccess: () => {
+         queryClient.invalidateQueries({ queryKey: ['cameras'] });
+      }
+   });
+
+   if (isAdding || editingCamera) {
+      return <AddCameraForm initialData={editingCamera} onCancel={() => { setIsAdding(false); setEditingCamera(null); }} />;
    }
+
+   const activeCameras = cameras?.filter(c => c.status?.toLowerCase() === 'online') || [];
+   const maintenanceCameras = cameras?.filter(c => c.status?.toLowerCase() === 'maintenance') || [];
+   const offlineCameras = cameras?.filter(c => c.status?.toLowerCase() === 'offline') || [];
 
    return (
       <div className="flex flex-col w-full max-w-[1024px] animate-in fade-in transition-all pb-24">
@@ -41,11 +61,11 @@ export default function CameraConfig() {
                   </div>
                </div>
                <div className="flex items-baseline gap-2 mt-1 mb-2">
-                  <span className="text-[#DEE5FF] font-space font-light text-[32px] leading-none">42</span>
-                  <span className="text-[#91AAEB] font-space font-light text-[18px]">/ 45</span>
+                  <span className="text-[#DEE5FF] font-space font-light text-[32px] leading-none">{activeCameras.length.toString().padStart(2, '0')}</span>
+                  <span className="text-[#91AAEB] font-space font-light text-[18px]">/ {cameras?.length || 0}</span>
                </div>
                <div className="w-full h-1 bg-[#00225A] rounded-full mt-auto">
-                  <div className="h-full bg-[#4EDEA3] rounded-full" style={{ width: '93%' }}></div>
+                  <div className="h-full bg-[#4EDEA3] rounded-full" style={{ width: `${cameras?.length ? (activeCameras.length / cameras.length) * 100 : 0}%` }}></div>
                </div>
             </div>
 
@@ -58,7 +78,7 @@ export default function CameraConfig() {
                   </div>
                </div>
                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-[#DEE5FF] font-space font-light text-[32px] leading-none">02</span>
+                  <span className="text-[#DEE5FF] font-space font-light text-[32px] leading-none">{maintenanceCameras.length.toString().padStart(2, '0')}</span>
                </div>
             </div>
 
@@ -71,7 +91,7 @@ export default function CameraConfig() {
                   </div>
                </div>
                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-[#DEE5FF] font-space font-light text-[32px] leading-none">01</span>
+                  <span className="text-[#DEE5FF] font-space font-light text-[32px] leading-none">{offlineCameras.length.toString().padStart(2, '0')}</span>
                </div>
             </div>
 
@@ -94,7 +114,7 @@ export default function CameraConfig() {
             </div>
 
             {/* Table Container */}
-            <div className="w-full flex-1 flex flex-col overflow-x-auto">
+            <div className="w-full flex-1 flex flex-col overflow-x-auto min-h-[300px]">
                {/* Column Headers */}
                <div className="grid grid-cols-[minmax(100px,1fr)_minmax(200px,2fr)_minmax(100px,1fr)_minmax(120px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(60px,0.5fr)] bg-[rgba(6,18,45,0.5)] border-b border-[rgba(43,70,128,0.1)] items-center px-4 py-4 w-full min-w-[800px]">
                   <div className="px-4 text-[#91AAEB] font-inter font-bold text-[10px] uppercase tracking-[1.2px]">Camera ID</div>
@@ -108,58 +128,46 @@ export default function CameraConfig() {
 
                {/* Rows */}
                <div className="flex flex-col w-full min-w-[800px]">
-                  
-                  {/* Row 1 */}
-                  <CameraRow 
-                     id="CAM-0042" idType="success"
-                     name="North-Entry Main" desc="High-definition wide angle for facial recognition"
-                     location="Zone A"
-                     status="Online" statusType="success"
-                     sourceUrl="RTSP://10.0.4.42" floor="Floor 01"
-                     date="Oct 12, 2023"
-                  />
-                  
-                  {/* Row 2 */}
-                  <CameraRow 
-                     id="CAM-0012" idType="neutral"
-                     name="Aisle 04 Thermal" desc="Heatmap tracking for high-traffic commerce"
-                     location="Zone A"
-                     status="Maintenance" statusType="warning"
-                     sourceUrl="UDP://10.0.1.12" floor="Floor 01"
-                     date="Sep 28, 2023"
-                  />
+                  {isLoading && (
+                     <div className="w-full flex justify-center py-10">
+                        <span className="text-[#91AAEB] font-inter">Loading cameras...</span>
+                     </div>
+                  )}
+                  {isError && (
+                     <div className="w-full flex justify-center py-10">
+                        <span className="text-[#EE7D77] font-inter">Failed to load cameras. Backend might be unreachable.</span>
+                     </div>
+                  )}
+                  {!isLoading && !isError && cameras?.length === 0 && (
+                     <div className="w-full flex justify-center py-10">
+                         <span className="text-[#91AAEB] font-inter">No cameras configured yet.</span>
+                     </div>
+                  )}
+                  {!isLoading && cameras?.map((camera, index) => {
+                     let statusType = 'neutral';
+                     if (camera.status?.toLowerCase() === 'online') statusType = 'success';
+                     if (camera.status?.toLowerCase() === 'offline') statusType = 'error';
+                     if (camera.status?.toLowerCase() === 'maintenance') statusType = 'warning';
 
-                  {/* Row 3 */}
-                  <CameraRow 
-                     id="CAM-0089" idType="neutral"
-                     name="Loading Dock 02" desc="LPR enabled for vehicle tracking"
-                     location="Parking"
-                     status="Offline" statusType="error"
-                     sourceUrl="RTSP://10.0.8.89" floor="Floor 00"
-                     date="Aug 15, 2023"
-                  />
-
-                  {/* Row 4 */}
-                  <CameraRow 
-                     id="CAM-0056" idType="success"
-                     name="Vault Corridor 01" desc="High-security perimeter monitoring"
-                     location="Zone B"
-                     status="Online" statusType="success"
-                     sourceUrl="HTTP://10.0.5.56" floor="Floor 02"
-                     date="Nov 03, 2023"
-                  />
-
-                  {/* Row 5 */}
-                  <CameraRow 
-                     id="CAM-0031" idType="success"
-                     name="Elevator Bank South" desc="PTZ camera with automated sweep pattern"
-                     location="Zone A"
-                     status="Online" statusType="success"
-                     sourceUrl="RTSP://10.0.3.31" floor="Floor 03"
-                     date="Oct 30, 2023"
-                     isLast={true}
-                  />
-
+                     return (
+                        <CameraRow 
+                           key={camera.camera_id}
+                           id={camera.camera_id} 
+                           idType={statusType === 'success' ? 'success' : 'neutral'}
+                           name={camera.name} 
+                           desc={camera.desc || "Standard fixed optical sensor"} 
+                           location={camera.location || "Unknown"}
+                           status={camera.status || "Unknown"} 
+                           statusType={statusType}
+                           sourceUrl={camera.sourceUrl || "RTSP://LOCAL_STREAM"} 
+                           floor={camera.floor || "Floor 1"} 
+                           date={camera.date || new Date().toLocaleDateString('en-US') + ", " + new Date().toLocaleTimeString()} 
+                           onEdit={() => setEditingCamera(camera)}
+                           onDelete={(id) => deleteMutation.mutate(id)}
+                           isLast={index === cameras.length - 1}
+                        />
+                     )
+                  })}
                </div>
             </div>
 
@@ -192,13 +200,81 @@ export default function CameraConfig() {
 }
 
 
-function AddCameraForm({ onCancel }) {
+const moduleFeatures = {
+   'Consumer Analytics': [
+      { id: 'IN / OUT count', label: 'IN / OUT count', icon: ArrowLeftRight },
+      { id: 'Dwell time', label: 'Dwell time', icon: Clock },
+      { id: 'Heat mapping', label: 'Heat mapping', icon: Map }
+   ],
+   'License Plate detection': [],
+   'Security analytics': [
+      { id: 'Fire detection', label: 'Fire detection', icon: Flame },
+      { id: 'Weapon detection', label: 'Weapon detection', icon: Crosshair }
+   ]
+};
+
+function AddCameraForm({ initialData, onCancel }) {
+   const queryClient = useQueryClient();
+   
+   // Form States
+   const [name, setName] = useState(initialData?.name || '');
+   const [location, setLocation] = useState(initialData?.location || '');
+   const [sourceUrl, setSourceUrl] = useState(initialData?.sourceUrl || 'rtsp://admin:password@192.168.1.100:554/stream1');
+   const [floor, setFloor] = useState(initialData?.floor || '');
+   const [description, setDescription] = useState(initialData?.desc || '');
+   const [status, setStatus] = useState(initialData?.status || 'Offline');
+
+   const [selectedModule, setSelectedModule] = useState(initialData?.module || 'Consumer Analytics');
+   
+   const defaultFeatures = {
+      'IN / OUT count': false,
+      'Dwell time': true,
+      'Heat mapping': false,
+      'Fire detection': false,
+      'Weapon detection': false
+   };
+   const [featuresState, setFeaturesState] = useState(initialData?.features || defaultFeatures);
+   
+   const isEditing = !!initialData;
+
+   const toggleFeature = (featureId) => {
+      setFeaturesState(prev => ({ ...prev, [featureId]: !prev[featureId] }));
+   };
+
+   const currentFeatures = moduleFeatures[selectedModule] || [];
+
+   const mutation = useMutation({
+      mutationFn: isEditing ? updateCamera : addCamera,
+      onSuccess: () => {
+         queryClient.invalidateQueries({ queryKey: ['cameras'] });
+         onCancel();
+      }
+   });
+
+   const handleSave = () => {
+      const payload = {
+         name,
+         location,
+         sourceUrl,
+         floor,
+         description,
+         module: selectedModule,
+         features: featuresState,
+         status
+      };
+      if (isEditing) {
+         mutation.mutate({ id: initialData.camera_id, cameraData: payload });
+      } else {
+         mutation.mutate(payload);
+      }
+   };
+
    return (
       <div className="flex flex-col w-full max-w-[1024px] animate-in fade-in slide-in-from-bottom-4 transition-all pb-32 gap-10 mt-2">
          
          {/* Page Header */}
          <div className="flex w-full">
-            <h2 className="text-[#DEE5FF] font-space font-bold text-[36px] tracking-[-0.9px]">Initialize New Camera</h2>
+            <h2 className="text-[#DEE5FF] font-space font-bold text-[36px] tracking-[-0.9px]">{isEditing ? 'Edit Camera Configuration' : 'Initialize New Camera'}</h2>
          </div>
 
          {/* Layout Grid */}
@@ -217,23 +293,34 @@ function AddCameraForm({ onCancel }) {
                   <div className="flex flex-col md:flex-row gap-6 w-full">
                      <div className="flex flex-col gap-2.5 flex-1 w-full">
                         <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Camera Name</label>
-                        <input type="text" placeholder="e.g. SOUTH_ENTRANCE_01" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
+                        <input value={name} onChange={e => setName(e.target.value)} type="text" placeholder="e.g. SOUTH_ENTRANCE_01" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
                      </div>
                      <div className="flex flex-col gap-2.5 flex-1 w-full">
                         <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Location / Zone</label>
-                        <select className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter focus:border-[#4EDEA3] focus:outline-none transition-colors appearance-none shadow-inner" defaultValue="Zone A - Loading Dock">
-                           <option value="Zone A - Loading Dock">Zone A - Loading Dock</option>
-                           <option value="Zone B - Vault">Zone B - Vault</option>
-                           <option value="Zone C - Lobby">Zone C - Lobby</option>
-                        </select>
+                        <input value={location} onChange={e => setLocation(e.target.value)} type="text" placeholder="e.g. Zone A - Loading Dock" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
                      </div>
                   </div>
 
-                  <div className="flex flex-col gap-2.5 w-full">
-                     <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Source RTSP/HTTP URL</label>
-                     <div className="relative flex items-center w-full group">
-                        <div className="absolute left-4 text-[#91AAEB] group-focus-within:text-[#4EDEA3] transition-colors"><Link size={14} /></div>
-                        <input type="text" defaultValue="rtsp://admin:password@192.168.1.100:554/stream1" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] pl-10 pr-4 text-[14px] text-[#6B7280] font-mono focus:text-[#DEE5FF] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
+                  <div className="flex flex-col md:flex-row gap-6 w-full">
+                     <div className="flex flex-col gap-2.5 flex-1 w-full">
+                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Source RTSP/HTTP URL</label>
+                        <div className="relative flex items-center w-full group">
+                           <div className="absolute left-4 text-[#91AAEB] group-focus-within:text-[#4EDEA3] transition-colors"><Link size={14} /></div>
+                           <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} type="text" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] pl-10 pr-4 text-[14px] text-[#6B7280] font-mono focus:text-[#DEE5FF] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
+                        </div>
+                     </div>
+                     <div className="flex flex-col gap-2.5 w-full md:w-[200px] shrink-0">
+                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Camera Status</label>
+                        <div className="relative flex items-center w-full group">
+                           <select value={status} onChange={e => setStatus(e.target.value)} className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 pr-10 text-[14px] text-[#DEE5FF] font-inter focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner appearance-none cursor-pointer">
+                              <option value="Online">Online</option>
+                              <option value="Maintenance">Maintenance</option>
+                              <option value="Offline">Offline</option>
+                           </select>
+                           <div className="absolute right-4 text-[#91AAEB] pointer-events-none group-focus-within:text-[#4EDEA3] transition-colors">
+                              <ChevronRight size={14} className="rotate-90" />
+                           </div>
+                        </div>
                      </div>
                   </div>
                </div>
@@ -248,11 +335,11 @@ function AddCameraForm({ onCancel }) {
                   <div className="flex flex-col md:flex-row gap-6 w-full">
                      <div className="flex flex-col gap-2.5 w-full md:w-[124px] shrink-0">
                         <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Floor Level</label>
-                        <input type="text" placeholder="0" className="bg-[#05183C] border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors" />
+                        <input value={floor} onChange={e => setFloor(e.target.value)} type="text" placeholder="0" className="bg-[#05183C] border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors" />
                      </div>
                      <div className="flex flex-col gap-2.5 flex-1 w-full">
                         <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Description</label>
-                        <input type="text" placeholder="Detailed purpose of this optical sensor..." className="bg-[#05183C] border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors" />
+                        <input value={description} onChange={e => setDescription(e.target.value)} type="text" placeholder="Detailed purpose of this optical sensor..." className="bg-[#05183C] border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors" />
                      </div>
                   </div>
                </div>
@@ -262,8 +349,8 @@ function AddCameraForm({ onCancel }) {
                   <button onClick={onCancel} className="text-[#91AAEB] font-inter font-bold text-[14px] px-8 py-3 hover:text-[#DEE5FF] hover:bg-white/5 rounded transition-all">
                      Cancel
                   </button>
-                  <button onClick={onCancel} className="bg-[#4EDEA3] text-[#004A31] font-inter font-bold text-[16px] px-10 py-3 rounded hover:bg-[#3dcd93] transition-colors shadow-[0_4px_15px_rgba(78,222,163,0.15)] truncate">
-                     Save Camera Node
+                  <button disabled={mutation.isPending} onClick={handleSave} className="bg-[#4EDEA3] text-[#004A31] font-inter font-bold text-[16px] px-10 py-3 rounded hover:bg-[#3dcd93] transition-colors shadow-[0_4px_15px_rgba(78,222,163,0.15)] truncate">
+                     {mutation.isPending ? 'Saving...' : (isEditing ? 'Update Camera Node' : 'Save Camera Node')}
                   </button>
                </div>
 
@@ -280,29 +367,22 @@ function AddCameraForm({ onCancel }) {
                   </div>
 
                   <div className="flex flex-col gap-3 w-full">
-                     {/* Item 1 */}
-                     <label className="flex items-center gap-4 bg-[#06122D] rounded px-4 py-3 cursor-pointer group hover:bg-[rgba(6,18,45,0.7)] transition-colors">
-                        <div className="w-[18px] h-[18px] flex items-center justify-center bg-black border border-[rgba(43,70,128,0.4)] rounded-sm group-hover:border-[#4EDEA3] transition-colors flex-shrink-0">
-                           <Check size={12} className="text-[#4EDEA3] opacity-0" />
-                        </div>
-                        <span className="text-[#DEE5FF] font-inter font-semibold text-[14px]">Consumer Analytics</span>
-                     </label>
-
-                     {/* Item 2 */}
-                     <label className="flex items-center gap-4 bg-[#06122D] rounded px-4 py-3 cursor-pointer group hover:bg-[rgba(6,18,45,0.7)] transition-colors border border-[rgba(78,222,163,0.2)]">
-                        <div className="w-[18px] h-[18px] flex items-center justify-center bg-black border border-[#4EDEA3] rounded-sm transition-colors flex-shrink-0">
-                           <Check size={12} className="text-[#4EDEA3] opacity-100" />
-                        </div>
-                        <span className="text-[#DEE5FF] font-inter font-semibold text-[14px]">License Plate detection</span>
-                     </label>
-
-                     {/* Item 3 */}
-                     <label className="flex items-center gap-4 bg-[#06122D] rounded px-4 py-3 cursor-pointer group hover:bg-[rgba(6,18,45,0.7)] transition-colors border border-[rgba(78,222,163,0.2)]">
-                        <div className="w-[18px] h-[18px] flex items-center justify-center bg-black border border-[#4EDEA3] rounded-sm transition-colors flex-shrink-0">
-                           <Check size={12} className="text-[#4EDEA3] opacity-100" />
-                        </div>
-                        <span className="text-[#DEE5FF] font-inter font-semibold text-[14px]">Security analytics</span>
-                     </label>
+                     {[
+                        { id: 'consumer', label: 'Consumer Analytics' },
+                        { id: 'license_plate', label: 'License Plate detection' },
+                        { id: 'security', label: 'Security analytics' }
+                     ].map((module) => (
+                        <label 
+                           key={module.id}
+                           onClick={() => setSelectedModule(module.label)} 
+                           className={`flex items-center gap-4 bg-[#06122D] rounded px-4 py-3 cursor-pointer group hover:bg-[rgba(6,18,45,0.7)] transition-colors ${selectedModule === module.label ? 'border border-[rgba(78,222,163,0.2)]' : ''}`}
+                        >
+                           <div className={`w-[18px] h-[18px] flex items-center justify-center bg-black rounded-sm transition-colors flex-shrink-0 ${selectedModule === module.label ? 'border border-[#4EDEA3]' : 'border border-[rgba(43,70,128,0.4)] group-hover:border-[#4EDEA3]'}`}>
+                              <Check size={12} className={`text-[#4EDEA3] ${selectedModule === module.label ? 'opacity-100' : 'opacity-0'}`} />
+                           </div>
+                           <span className="text-[#DEE5FF] font-inter font-semibold text-[14px]">{module.label}</span>
+                        </label>
+                     ))}
                   </div>
                </div>
 
@@ -314,38 +394,28 @@ function AddCameraForm({ onCancel }) {
                   </div>
 
                   <div className="flex flex-col gap-5 w-full">
-                     {/* Toggle 1 */}
-                     <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-3">
-                           <ArrowLeftRight size={14} className="text-[#91AAEB]" />
-                           <span className="text-[#DEE5FF] font-inter text-[14px]">IN / OUT count</span>
+                     {currentFeatures.length === 0 ? (
+                        <div className="flex items-center justify-center py-4 opacity-70">
+                           <span className="text-[#91AAEB] font-inter text-[13px] italic">No configurable features needed.</span>
                         </div>
-                        <button className="w-10 h-[22px] bg-[#00225A] rounded-full flex justify-start items-center p-1 transition-colors">
-                           <div className="w-[14px] h-[14px] bg-[#8F9FB7] rounded-full"></div>
-                        </button>
-                     </div>
-
-                     {/* Toggle 2 */}
-                     <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-3">
-                           <Clock size={14} className="text-[#91AAEB]" />
-                           <span className="text-[#DEE5FF] font-inter text-[14px]">Dwell time</span>
-                        </div>
-                        <button className="w-10 h-[22px] bg-[#005236]/50 rounded-full flex justify-end items-center p-1 transition-colors shadow-inner">
-                           <div className="w-[14px] h-[14px] bg-[#4EDEA3] rounded-full"></div>
-                        </button>
-                     </div>
-
-                     {/* Toggle 3 */}
-                     <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-3">
-                           <Map size={14} className="text-[#91AAEB]" />
-                           <span className="text-[#DEE5FF] font-inter text-[14px]">Heat mapping</span>
-                        </div>
-                        <button className="w-10 h-[22px] bg-[#00225A] rounded-full flex justify-start items-center p-1 transition-colors">
-                           <div className="w-[14px] h-[14px] bg-[#8F9FB7] rounded-full"></div>
-                        </button>
-                     </div>
+                     ) : (
+                        currentFeatures.map((feature) => {
+                           const isEnabled = featuresState[feature.id];
+                           const Icon = feature.icon;
+                           
+                           return (
+                              <div key={feature.id} className="flex items-center justify-between w-full group cursor-pointer" onClick={() => toggleFeature(feature.id)}>
+                                 <div className="flex items-center gap-3">
+                                    <Icon size={14} className="text-[#91AAEB] group-hover:text-[#4EDEA3] transition-colors" />
+                                    <span className="text-[#DEE5FF] font-inter text-[14px] group-hover:text-[#4EDEA3] transition-colors">{feature.label}</span>
+                                 </div>
+                                 <button className={`w-10 h-[22px] rounded-full flex items-center p-1 transition-colors ${isEnabled ? 'bg-[#005236]/50 justify-end shadow-inner border border-transparent' : 'bg-[#00225A] justify-start border border-[#2B4680]'}`}>
+                                    <div className={`w-[14px] h-[14px] rounded-full transition-colors ${isEnabled ? 'bg-[#4EDEA3]' : 'bg-[#8F9FB7]'}`}></div>
+                                 </button>
+                              </div>
+                           );
+                        })
+                     )}
                   </div>
                </div>
 
@@ -371,8 +441,8 @@ function AddCameraForm({ onCancel }) {
 
             {/* Form Actions (Mobile) */}
             <div className="flex lg:hidden flex-col items-center gap-3 mt-4">
-               <button onClick={onCancel} className="bg-[#4EDEA3] text-[#004A31] w-full font-inter font-bold text-[16px] px-10 py-4 rounded hover:bg-[#3dcd93] transition-colors shadow-[0_4px_15px_rgba(78,222,163,0.15)] text-center">
-                  Save Camera Node
+               <button disabled={mutation.isPending} onClick={handleSave} className="bg-[#4EDEA3] text-[#004A31] w-full font-inter font-bold text-[16px] px-10 py-4 rounded hover:bg-[#3dcd93] transition-colors shadow-[0_4px_15px_rgba(78,222,163,0.15)] text-center">
+                  {mutation.isPending ? 'Saving...' : (isEditing ? 'Update Node' : 'Save Node')}
                </button>
                <button onClick={onCancel} className="text-[#91AAEB] w-full font-inter font-bold text-[14px] px-8 py-4 hover:text-[#DEE5FF] hover:bg-white/5 rounded transition-all text-center">
                   Cancel
@@ -385,7 +455,7 @@ function AddCameraForm({ onCancel }) {
 }
 
 
-function CameraRow({ id, idType, name, desc, location, status, statusType, sourceUrl, floor, date, isLast }) {
+function CameraRow({ id, idType, name, desc, location, status, statusType, sourceUrl, floor, date, isLast, onEdit, onDelete }) {
    return (
       <div className={`grid grid-cols-[minmax(100px,1fr)_minmax(200px,2fr)_minmax(100px,1fr)_minmax(120px,1fr)_minmax(160px,1.5fr)_minmax(100px,1fr)_minmax(60px,0.5fr)] items-center px-4 py-5 ${isLast ? '' : 'border-b border-[rgba(43,70,128,0.05)]'} hover:bg-[#06122D]/50 transition-colors group`}>
          
@@ -436,9 +506,20 @@ function CameraRow({ id, idType, name, desc, location, status, statusType, sourc
          </div>
 
          {/* Actions */}
-         <div className="px-4 flex justify-end">
-            <button className="text-[rgba(145,170,235,0)] group-hover:text-[#91AAEB] hover:!text-[#DEE5FF] p-2 rounded transition-all opacity-0 group-hover:opacity-100">
-               <MoreHorizontal size={18} />
+         <div className="px-4 flex justify-end gap-1">
+            <button onClick={onEdit} className="text-[#91AAEB] hover:text-[#4EDEA3] p-2 rounded transition-all opacity-0 group-hover:opacity-100" title="Edit Camera">
+               <Edit2 size={16} />
+            </button>
+            <button 
+               onClick={() => {
+                  if (window.confirm("Are you sure you want to delete this camera? This action cannot be undone.")) {
+                     onDelete(id);
+                  }
+               }} 
+               className="text-[#91AAEB] hover:text-[#EE7D77] p-2 rounded transition-all opacity-0 group-hover:opacity-100" 
+               title="Delete Camera"
+            >
+               <Trash2 size={16} />
             </button>
          </div>
 

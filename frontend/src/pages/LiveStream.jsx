@@ -1,9 +1,30 @@
 import React from 'react';
-import { ShieldAlert, Users, CheckCircle, Store } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { getCameras, getFootfall } from '../services/api';
+import { ShieldAlert, Store } from 'lucide-react';
 import FeedCard from '../components/FeedCard';
 import AlertItem from '../components/AlertItem';
 
 export default function LiveStream() {
+   const { data: cameras, isLoading: isLoadingCameras } = useQuery({
+      queryKey: ['cameras'],
+      queryFn: getCameras,
+   });
+
+   const { data: footfalls, isLoading: isLoadingOccupancy } = useQuery({
+      queryKey: ['footfall'],
+      queryFn: getFootfall,
+   });
+
+   const activeCamerasCount = cameras?.filter(c => c.status?.toLowerCase() === 'online').length || 0;
+   const totalCamerasCount = cameras?.length || 0;
+
+   const getLiveOccupancy = () => {
+      if (!footfalls || footfalls.length === 0) return 0;
+      return footfalls.slice(0, 5).reduce((acc, log) => acc + log.count, 0);
+   };
+   const liveOccupancy = getLiveOccupancy();
+
    return (
       <div className="flex flex-col xl:flex-row gap-6 w-full max-w-[1024px]">
          {/* Left Column */}
@@ -11,13 +32,17 @@ export default function LiveStream() {
 
             {/* Secondary Data Row */}
             <div className="flex flex-row gap-6 w-full">
-               <div className="bg-[#06122D] rounded-lg px-6 py-6 pb-10 flex-1 flex flex-col gap-2 relative">
+               <div className="bg-[#06122D] rounded-lg px-6 py-6 pb-10 flex-1 flex flex-col gap-2 relative shadow-sm">
                   <span className="text-[#91AAEB] font-inter font-semibold text-[12px] tracking-[0.6px]">ACTIVE CAMERAS</span>
-                  <span className="text-[#DEE5FF] font-space font-bold text-[30px] leading-none mt-2">12 / 15</span>
+                  <span className="text-[#DEE5FF] font-space font-bold text-[30px] leading-none mt-2">
+                     {isLoadingCameras ? '...' : `${activeCamerasCount} / ${totalCamerasCount}`}
+                  </span>
                </div>
-               <div className="bg-[#06122D] rounded-lg px-6 py-6 pb-10 flex-1 flex flex-col gap-2 relative">
+               <div className="bg-[#06122D] rounded-lg px-6 py-6 pb-10 flex-1 flex flex-col gap-2 relative shadow-sm">
                   <span className="text-[#91AAEB] font-inter font-semibold text-[12px] tracking-[0.6px]">CURRENT OCCUPANCY</span>
-                  <span className="text-[#DEE5FF] font-space font-bold text-[30px] leading-none mt-2">240</span>
+                  <span className="text-[#DEE5FF] font-space font-bold text-[30px] leading-none mt-2">
+                     {isLoadingOccupancy ? '...' : liveOccupancy}
+                  </span>
                </div>
             </div>
 
