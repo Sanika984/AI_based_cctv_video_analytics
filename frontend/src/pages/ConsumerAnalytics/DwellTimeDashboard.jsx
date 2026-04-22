@@ -13,7 +13,9 @@ export default function DwellTimeDashboard() {
    const [currentPage, setCurrentPage] = useState(0);
 
    const filteredCameras = cameras?.filter(c => 
-      c.module === 'Consumer Analytics' && c.features?.['Dwell time'] === true
+      c.status?.toLowerCase() === 'online' &&
+      c.module === 'Consumer Analytics' && 
+      c.features?.['Dwell time'] === true
    ) || [];
    
    const pageCount = Math.ceil(filteredCameras.length / 4);

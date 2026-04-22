@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCameras, getFootfall } from '../services/api';
-import { ShieldAlert, Store } from 'lucide-react';
+import { ShieldAlert, Store, ChevronLeft, ChevronRight } from 'lucide-react';
 import FeedCard from '../components/FeedCard';
 import AlertItem from '../components/AlertItem';
 
@@ -18,6 +18,11 @@ export default function LiveStream() {
 
    const activeCamerasCount = cameras?.filter(c => c.status?.toLowerCase() === 'online').length || 0;
    const totalCamerasCount = cameras?.length || 0;
+
+   const [currentPage, setCurrentPage] = useState(0);
+   const allCameras = cameras?.filter(c => c.status?.toLowerCase() === 'online') || [];
+   const pageCount = Math.ceil(allCameras.length / 4);
+   const displayedCameras = allCameras.slice(currentPage * 4, (currentPage + 1) * 4);
 
    const getLiveOccupancy = () => {
       if (!footfalls || footfalls.length === 0) return 0;
@@ -47,11 +52,45 @@ export default function LiveStream() {
             </div>
 
             {/* Live Feeds Grid */}
-            <div className="grid grid-cols-2 gap-4 w-full h-[362px]">
-               <FeedCard title="CAM-01: FRONT ENTRANCE" />
-               <FeedCard title="CAM-04: CHECKOUT" />
-               <FeedCard title="CAM-12: AISLE 3" />
-               <FeedCard title="CAM-18: PARKING LOT" />
+            <div className="flex flex-col gap-4 w-full">
+               <div className="grid grid-cols-2 gap-4 h-[362px]">
+                  {isLoadingCameras ? (
+                     <div className="col-span-2 flex items-center justify-center h-full">
+                        <span className="text-[#91AAEB] font-inter">Loading cameras...</span>
+                     </div>
+                  ) : displayedCameras.length > 0 ? (
+                     displayedCameras.map(camera => (
+                        <FeedCard key={camera.camera_id} title={camera.name} />
+                     ))
+                  ) : (
+                     <div className="col-span-2 flex items-center justify-center h-full border border-dashed border-[rgba(43,70,128,0.3)] rounded-lg bg-[#06122D]">
+                        <span className="text-[#91AAEB] font-inter">No cameras configured yet.</span>
+                     </div>
+                  )}
+               </div>
+
+               {/* Pagination Controls */}
+               {pageCount > 1 && (
+                  <div className="flex justify-between items-center bg-[#06122D] p-3 rounded-lg border border-[rgba(43,70,128,0.1)]">
+                     <span className="text-[#91AAEB] font-inter text-[12px]">Showing page {currentPage + 1} of {pageCount}</span>
+                     <div className="flex gap-2">
+                        <button 
+                           onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                           disabled={currentPage === 0}
+                           className="flex items-center gap-1 px-3 py-1.5 bg-[#05183C] text-[#DEE5FF] rounded hover:bg-[#4EDEA3] hover:text-[#004A31] transition-colors disabled:opacity-50 disabled:hover:bg-[#05183C] disabled:hover:text-[#DEE5FF]"
+                        >
+                           <ChevronLeft size={14} /> <span className="text-[12px] font-medium">Prev</span>
+                        </button>
+                        <button 
+                           onClick={() => setCurrentPage(p => Math.min(pageCount - 1, p + 1))}
+                           disabled={currentPage >= pageCount - 1}
+                           className="flex items-center gap-1 px-3 py-1.5 bg-[#05183C] text-[#DEE5FF] rounded hover:bg-[#4EDEA3] hover:text-[#004A31] transition-colors disabled:opacity-50 disabled:hover:bg-[#05183C] disabled:hover:text-[#DEE5FF]"
+                        >
+                           <span className="text-[12px] font-medium">Next</span> <ChevronRight size={14} />
+                        </button>
+                     </div>
+                  </div>
+               )}
             </div>
          </div>
 

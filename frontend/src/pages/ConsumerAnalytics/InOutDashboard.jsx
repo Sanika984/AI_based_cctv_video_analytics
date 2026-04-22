@@ -18,7 +18,9 @@ export default function InOutDashboard() {
    const [currentPage, setCurrentPage] = useState(0);
 
    const filteredCameras = cameras?.filter(c => 
-      c.module === 'Consumer Analytics' && c.features?.['IN / OUT count'] === true
+      c.status?.toLowerCase() === 'online' &&
+      c.module === 'Consumer Analytics' && 
+      c.features?.['IN / OUT count'] === true
    ) || [];
    
    const pageCount = Math.ceil(filteredCameras.length / 4);
