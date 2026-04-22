@@ -8,6 +8,17 @@ from app.models.camera import Camera
 from app.models.camera_metadata import CameraMetadata
 from app.models.camera_module import CameraModule
 from app.models.camera_feature import CameraFeature
+from app.models.camera_in_out_config import CameraInOutConfig
+from fastapi.responses import StreamingResponse
+import cv2
+import io
+
+class InOutConfig(BaseModel):
+    p1_x: int
+    p1_y: int
+    p2_x: int
+    p2_y: int
+    in_side: int
 
 class CameraCreate(BaseModel):
     name: str
@@ -18,6 +29,10 @@ class CameraCreate(BaseModel):
     module: str
     features: Dict[str, bool]
     status: str
+    inOutConfig: Optional[InOutConfig] = None
+
+class SnapshotRequest(BaseModel):
+    sourceUrl: str
 
 router = APIRouter()
 
@@ -35,6 +50,17 @@ def get_cameras(db=Depends(get_db)):
     for c in cams:
         module_name = c.modules[0].module_name if c.modules else "Consumer Analytics"
         features_dict = {f.feature_name: f.is_enabled for f in c.features} if c.features else {}
+        
+        in_out_data = None
+        if c.in_out_config:
+            in_out_data = {
+                "p1_x": c.in_out_config.p1_x,
+                "p1_y": c.in_out_config.p1_y,
+                "p2_x": c.in_out_config.p2_x,
+                "p2_y": c.in_out_config.p2_y,
+                "in_side": c.in_out_config.in_side
+            }
+
         result.append({
             "camera_id": c.camera_id,
             "name": c.name,
@@ -45,9 +71,37 @@ def get_cameras(db=Depends(get_db)):
             "desc": (c.metadata_info.description if c.metadata_info and c.metadata_info.description else "No description available"),
             "floor": (c.metadata_info.floor if c.metadata_info and c.metadata_info.floor else "Unknown"),
             "module": module_name,
-            "features": features_dict
+            "features": features_dict,
+            "inOutConfig": in_out_data
         })
     return result
+
+@router.post("/snapshot")
+def get_snapshot(payload: SnapshotRequest):
+    source_url = payload.sourceUrl
+    
+    # Handle demo video requests
+    if source_url.startswith("demo://"):
+        # map demo url to local video file
+        import os
+        base_path = os.getcwd()
+        if "videos/p.mp4" in source_url:
+            source_url = os.path.join(base_path, "videos/p.mp4")
+        else:
+            source_url = os.path.join(base_path, "videos/p.mp4") # Default demo
+            
+    cap = cv2.VideoCapture(source_url)
+    if not cap.isOpened():
+        raise HTTPException(status_code=400, detail="Could not connect to camera stream")
+    
+    ret, frame = cap.read()
+    cap.release()
+    
+    if not ret:
+        raise HTTPException(status_code=500, detail="Could not read frame from camera")
+    
+    _, buffer = cv2.imencode('.jpg', frame)
+    return StreamingResponse(io.BytesIO(buffer.tobytes()), media_type="image/jpeg")
 
 @router.post("/", status_code=201)
 def create_camera(payload: CameraCreate, db=Depends(get_db)):
@@ -86,6 +140,17 @@ def create_camera(payload: CameraCreate, db=Depends(get_db)):
                     feature_name=feat_name,
                     is_enabled=is_enabled
                 ))
+        
+        # Add InOut Config
+        if payload.inOutConfig:
+            db.add(CameraInOutConfig(
+                camera_id=camera_id,
+                p1_x=payload.inOutConfig.p1_x,
+                p1_y=payload.inOutConfig.p1_y,
+                p2_x=payload.inOutConfig.p2_x,
+                p2_y=payload.inOutConfig.p2_y,
+                in_side=payload.inOutConfig.in_side
+            ))
 
         db.commit()
         return {"message": "Camera created successfully", "camera_id": camera_id}
@@ -130,6 +195,18 @@ def update_camera(camera_id: str, payload: CameraCreate, db=Depends(get_db)):
         if payload.features:
             for feat_name, is_enabled in payload.features.items():
                 db.add(CameraFeature(camera_id=camera_id, feature_name=feat_name, is_enabled=is_enabled))
+        
+        # Update InOut Config
+        db.query(CameraInOutConfig).filter(CameraInOutConfig.camera_id == camera_id).delete()
+        if payload.inOutConfig:
+            db.add(CameraInOutConfig(
+                camera_id=camera_id,
+                p1_x=payload.inOutConfig.p1_x,
+                p1_y=payload.inOutConfig.p1_y,
+                p2_x=payload.inOutConfig.p2_x,
+                p2_y=payload.inOutConfig.p2_y,
+                in_side=payload.inOutConfig.in_side
+            ))
                 
         db.commit()
         return {"message": "Camera updated successfully"}

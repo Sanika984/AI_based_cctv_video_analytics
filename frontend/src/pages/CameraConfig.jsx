@@ -6,6 +6,7 @@ import {
    ChevronLeft, ChevronRight, Info, Database, Cpu, Settings2, Link, 
    VideoOff, ArrowLeftRight, Clock, Map, Check, Flame, Crosshair, Edit2, Trash2 
 } from 'lucide-react';
+import LineSetupModal from '../components/LineSetupModal';
 
 
 export default function CameraConfig() {
@@ -234,6 +235,8 @@ function AddCameraForm({ initialData, onCancel }) {
       'Weapon detection': false
    };
    const [featuresState, setFeaturesState] = useState(initialData?.features || defaultFeatures);
+   const [inOutConfig, setInOutConfig] = useState(initialData?.inOutConfig || null);
+   const [showLineModal, setShowLineModal] = useState(false);
    
    const isEditing = !!initialData;
 
@@ -260,7 +263,8 @@ function AddCameraForm({ initialData, onCancel }) {
          description,
          module: selectedModule,
          features: featuresState,
-         status
+         status,
+         inOutConfig
       };
       if (isEditing) {
          mutation.mutate({ id: initialData.camera_id, cameraData: payload });
@@ -303,7 +307,16 @@ function AddCameraForm({ initialData, onCancel }) {
 
                   <div className="flex flex-col md:flex-row gap-6 w-full">
                      <div className="flex flex-col gap-2.5 flex-1 w-full">
-                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Source RTSP/HTTP URL</label>
+                        <div className="flex justify-between items-center w-full">
+                           <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Source RTSP/HTTP URL</label>
+                           <button 
+                              type="button"
+                              onClick={() => setSourceUrl('demo://videos/p.mp4')}
+                              className="text-[#4EDEA3] font-inter font-bold text-[10px] uppercase tracking-[1px] hover:underline"
+                           >
+                              Use Demo Video
+                           </button>
+                        </div>
                         <div className="relative flex items-center w-full group">
                            <div className="absolute left-4 text-[#91AAEB] group-focus-within:text-[#4EDEA3] transition-colors"><Link size={14} /></div>
                            <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} type="text" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] pl-10 pr-4 text-[14px] text-[#6B7280] font-mono focus:text-[#DEE5FF] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
@@ -404,20 +417,48 @@ function AddCameraForm({ initialData, onCancel }) {
                            const Icon = feature.icon;
                            
                            return (
-                              <div key={feature.id} className="flex items-center justify-between w-full group cursor-pointer" onClick={() => toggleFeature(feature.id)}>
-                                 <div className="flex items-center gap-3">
-                                    <Icon size={14} className="text-[#91AAEB] group-hover:text-[#4EDEA3] transition-colors" />
-                                    <span className="text-[#DEE5FF] font-inter text-[14px] group-hover:text-[#4EDEA3] transition-colors">{feature.label}</span>
+                              <div key={feature.id} className="flex flex-col gap-3 w-full group">
+                                 <div className="flex items-center justify-between w-full cursor-pointer" onClick={() => toggleFeature(feature.id)}>
+                                    <div className="flex items-center gap-3">
+                                       <Icon size={14} className="text-[#91AAEB] group-hover:text-[#4EDEA3] transition-colors" />
+                                       <span className="text-[#DEE5FF] font-inter text-[14px] group-hover:text-[#4EDEA3] transition-colors">{feature.label}</span>
+                                    </div>
+                                    <button type="button" className={`w-10 h-[22px] rounded-full flex items-center p-1 transition-colors ${isEnabled ? 'bg-[#005236]/50 justify-end shadow-inner border border-transparent' : 'bg-[#00225A] justify-start border border-[#2B4680]'}`}>
+                                       <div className={`w-[14px] h-[14px] rounded-full transition-colors ${isEnabled ? 'bg-[#4EDEA3]' : 'bg-[#8F9FB7]'}`}></div>
+                                    </button>
                                  </div>
-                                 <button className={`w-10 h-[22px] rounded-full flex items-center p-1 transition-colors ${isEnabled ? 'bg-[#005236]/50 justify-end shadow-inner border border-transparent' : 'bg-[#00225A] justify-start border border-[#2B4680]'}`}>
-                                    <div className={`w-[14px] h-[14px] rounded-full transition-colors ${isEnabled ? 'bg-[#4EDEA3]' : 'bg-[#8F9FB7]'}`}></div>
-                                 </button>
+                                 
+                                 {feature.id === 'IN / OUT count' && isEnabled && (
+                                    <button 
+                                       type="button"
+                                       onClick={(e) => {
+                                          e.stopPropagation();
+                                          setShowLineModal(true);
+                                       }}
+                                       className={`flex items-center justify-center gap-2 w-full py-2 rounded border border-dashed text-[12px] font-bold transition-all ${inOutConfig ? 'border-[#4EDEA3]/30 text-[#4EDEA3] bg-[#005236]/20' : 'border-[#91AAEB]/30 text-[#91AAEB] hover:border-[#4EDEA3] hover:text-[#4EDEA3]'}`}
+                                    >
+                                       <Check size={14} className={inOutConfig ? 'block' : 'hidden'} />
+                                       {inOutConfig ? 'Line Configured' : 'Configure Crossing Line'}
+                                    </button>
+                                 )}
                               </div>
                            );
                         })
                      )}
                   </div>
                </div>
+
+               {showLineModal && (
+                  <LineSetupModal 
+                     sourceUrl={sourceUrl}
+                     initialConfig={inOutConfig}
+                     onSave={(config) => {
+                        setInOutConfig(config);
+                        setShowLineModal(false);
+                     }}
+                     onCancel={() => setShowLineModal(false)}
+                  />
+               )}
 
                {/* Preview Card */}
                <div className="bg-black border border-[rgba(43,70,128,0.2)] rounded-lg min-h-[171px] flex flex-col justify-center items-center gap-3 overflow-hidden relative shadow-inner">
