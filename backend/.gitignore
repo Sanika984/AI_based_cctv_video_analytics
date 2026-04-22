@@ -76,7 +76,6 @@ logs/
 # Data, models, and uploads
 data/
 videos/
-models/
 
 # Ignore local configuration files
 config/*.local.json

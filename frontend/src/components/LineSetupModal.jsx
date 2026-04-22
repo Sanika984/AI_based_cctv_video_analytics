@@ -96,7 +96,7 @@ export default function LineSetupModal({ sourceUrl, initialConfig, onSave, onCan
 
         // Draw Arrow
         ctx.beginPath();
-        ctx.strokeStyle = '#FFB148';
+        ctx.strokeStyle = '#48ff57ff';
         ctx.lineWidth = 5;
         ctx.moveTo(mx, my);
         ctx.lineTo(ex, ey);
@@ -114,7 +114,7 @@ export default function LineSetupModal({ sourceUrl, initialConfig, onSave, onCan
         ctx.fill();
 
         // Label
-        ctx.font = 'bold 18px Inter';
+        ctx.font = 'bold 28px Inter';
         ctx.fillStyle = '#48ff57ff';
         ctx.fillText('IN', ex + 10, ey + 10);
     };
