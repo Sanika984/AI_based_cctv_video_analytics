@@ -17,6 +17,21 @@ export const getHeatmap = async () => {
   return data;
 };
 
+export const getInOutSummary = async () => {
+  const { data } = await api.get('/analytics/in-out/summary');
+  return data;
+};
+
+export const getFloorWiseStats = async () => {
+  const { data } = await api.get('/analytics/in-out/floor-wise');
+  return data;
+};
+
+export const getHourlyStats = async () => {
+  const { data } = await api.get('/analytics/in-out/hourly-stats');
+  return data;
+};
+
 export const getCameras = async () => {
   const { data } = await api.get('/cameras');
   return data;

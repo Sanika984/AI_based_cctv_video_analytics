@@ -12,3 +12,4 @@ from .camera_metadata import CameraMetadata
 from .camera_module import CameraModule
 from .camera_feature import CameraFeature
 from .camera_in_out_config import CameraInOutConfig
+from .in_out_log import InOutLog
