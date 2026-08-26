@@ -57,8 +57,13 @@ export const deleteCamera = async (id) => {
   return data;
 };
 
+export const getCameraById = async (id) => {
+  const { data } = await api.get(`/cameras/${id}`);
+  return data;
+};
+
 export const getCameraSnapshot = async (sourceUrl) => {
-  const { data } = await api.post('/cameras/snapshot', { sourceUrl }, { responseType: 'blob' });
+  const { data } = await api.post('/stream/snapshot', { sourceUrl }, { responseType: 'blob' });
   return data;
 };
 

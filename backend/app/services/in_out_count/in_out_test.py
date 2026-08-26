@@ -1,5 +1,5 @@
-from line_setup import select_line
-from people_counting import count_people
+from backend.app.services.in_out_count.line_setup import select_line
+from backend.app.services.in_out_count.people_counting import count_people
 
 video_path = "/Users/chaitanyashankar/Desktop/Projects/AI_Based_CCTV_video_analytics/videos/p.mp4"
 output_path = "output.mp4"

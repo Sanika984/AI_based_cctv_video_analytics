@@ -17,14 +17,14 @@ db = SessionLocal()
 
 # Seed Cameras
 camera_data = [
-    {"id": "cam_1", "name": "MAIN ENTRANCE", "location": "Zone A", "status": "online"},
-    {"id": "cam_2", "name": "EXIT 01", "location": "Zone A", "status": "online"},
-    {"id": "cam_3", "name": "WEST ENTRANCE", "location": "Zone B", "status": "online"},
-    {"id": "cam_4", "name": "EXIT 02", "location": "Zone B", "status": "maintenance"},
-    {"id": "cam_5", "name": "CHECKOUT", "location": "Zone C", "status": "online"},
-    {"id": "cam_12", "name": "AISLE 3", "location": "Zone C", "status": "online"},
-    {"id": "cam_18", "name": "PARKING LOT", "location": "Exterior", "status": "offline"},
-    {"id": "cam_19", "name": "LOADING DOCK", "location": "Exterior", "status": "online"},
+    {"id": "cam_1", "name": "MAIN ENTRANCE", "location": "Zone A", "status": "Online"},
+    {"id": "cam_2", "name": "EXIT 01", "location": "Zone A", "status": "Online"},
+    {"id": "cam_3", "name": "WEST ENTRANCE", "location": "Zone B", "status": "Online"},
+    {"id": "cam_4", "name": "EXIT 02", "location": "Zone B", "status": "Offline"},
+    {"id": "cam_5", "name": "CHECKOUT", "location": "Zone C", "status": "Online"},
+    {"id": "cam_12", "name": "AISLE 3", "location": "Zone C", "status": "Online"},
+    {"id": "cam_18", "name": "PARKING LOT", "location": "Exterior", "status": "Offline"},
+    {"id": "cam_19", "name": "LOADING DOCK", "location": "Exterior", "status": "Online"},
 ]
 
 for c in camera_data:

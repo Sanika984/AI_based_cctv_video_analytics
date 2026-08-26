@@ -1,3 +1,4 @@
+import io
 from ultralytics import YOLO
 import cv2
 import numpy as np
@@ -10,8 +11,36 @@ from app.db.connection import SessionLocal
 from app.models.camera import Camera
 from app.models.camera_in_out_config import CameraInOutConfig
 from app.models.in_out_log import InOutLog
+from app.schemas.camera import SnapshotRequest
 
 router = APIRouter()
+
+@router.post("/snapshot")
+def get_snapshot(payload: SnapshotRequest):
+    source_url = payload.sourceUrl
+    
+    # Handle demo video requests
+    if source_url.startswith("demo://"):
+        # map demo url to local video file
+        base_path = os.getcwd()
+        if "videos/p.mp4" in source_url:
+            source_url = os.path.join(base_path, "videos/p.mp4")
+        else:
+            source_url = os.path.join(base_path, "videos/p.mp4") # Default demo
+            
+    cap = cv2.VideoCapture(source_url)
+    if not cap.isOpened():
+        raise HTTPException(status_code=400, detail="Could not connect to camera stream")
+    
+    ret, frame = cap.read()
+    cap.release()
+    
+    if not ret:
+        raise HTTPException(status_code=500, detail="Could not read frame from camera")
+    
+    _, buffer = cv2.imencode('.jpg', frame)
+    return StreamingResponse(io.BytesIO(buffer.tobytes()), media_type="image/jpeg")
+
 
 # Load YOLO model
 model = YOLO("yolov8n.pt") 

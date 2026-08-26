@@ -1,40 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from typing import Dict, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
 from datetime import datetime
 import uuid
+
 from app.db.connection import SessionLocal
 from app.models.camera import Camera
-from app.models.camera_metadata import CameraMetadata
 from app.models.camera_module import CameraModule
 from app.models.camera_feature import CameraFeature
 from app.models.camera_in_out_config import CameraInOutConfig
-from fastapi.responses import StreamingResponse
-import cv2
-import io
-
-class InOutConfig(BaseModel):
-    p1_x: int
-    p1_y: int
-    p2_x: int
-    p2_y: int
-    in_side: int
-
-class CameraCreate(BaseModel):
-    name: str
-    location: str
-    sourceUrl: str
-    floor: Optional[str] = None
-    description: Optional[str] = None
-    module: str
-    features: Dict[str, bool]
-    status: str
-    inOutConfig: Optional[InOutConfig] = None
-
-class SnapshotRequest(BaseModel):
-    sourceUrl: str
+from app.schemas.camera import CameraCreate, CameraUpdate
 
 router = APIRouter()
+
 
 def get_db():
     db = SessionLocal()
@@ -43,94 +21,72 @@ def get_db():
     finally:
         db.close()
 
-@router.get("/")
-def get_cameras(db=Depends(get_db)):
+
+def generate_camera_id() -> str:
+    return f"CAM-{uuid.uuid4().hex[:6].upper()}"
+
+
+def format_camera_response(c: Camera) -> dict:
+    module_name = c.modules[0].module_name if c.modules else "Consumer Analytics"
+    features_dict = {f.feature_name: f.is_enabled for f in c.features} if c.features else {}
+    
+    in_out_data = None
+    if c.in_out_config:
+        in_out_data = {
+            "p1_x": c.in_out_config.p1_x,
+            "p1_y": c.in_out_config.p1_y,
+            "p2_x": c.in_out_config.p2_x,
+            "p2_y": c.in_out_config.p2_y,
+            "in_side": c.in_out_config.in_side
+        }
+
+    return {
+        "camera_id": c.camera_id,
+        "name": c.name,
+        "zone": c.location,
+        "status": c.status,
+        "sourceUrl": c.source,
+        "module": module_name,
+        "features": features_dict,
+        "inOutConfig": in_out_data
+    }
+
+
+@router.get("/", status_code=status.HTTP_200_OK)
+def get_cameras(db: Session = Depends(get_db)):
     cams = db.query(Camera).all()
-    result = []
-    for c in cams:
-        module_name = c.modules[0].module_name if c.modules else "Consumer Analytics"
-        features_dict = {f.feature_name: f.is_enabled for f in c.features} if c.features else {}
-        
-        in_out_data = None
-        if c.in_out_config:
-            in_out_data = {
-                "p1_x": c.in_out_config.p1_x,
-                "p1_y": c.in_out_config.p1_y,
-                "p2_x": c.in_out_config.p2_x,
-                "p2_y": c.in_out_config.p2_y,
-                "in_side": c.in_out_config.in_side
-            }
+    return [format_camera_response(c) for c in cams]
 
-        result.append({
-            "camera_id": c.camera_id,
-            "name": c.name,
-            "location": c.location,
-            "status": c.status,
-            "sourceUrl": c.source,
-            "date": c.created_at.strftime("%b %d, %Y, %I:%M:%S %p") if c.created_at else "",
-            "desc": (c.metadata_info.description if c.metadata_info and c.metadata_info.description else "No description available"),
-            "floor": (c.metadata_info.floor if c.metadata_info and c.metadata_info.floor else "Unknown"),
-            "module": module_name,
-            "features": features_dict,
-            "inOutConfig": in_out_data
-        })
-    return result
 
-@router.post("/snapshot")
-def get_snapshot(payload: SnapshotRequest):
-    source_url = payload.sourceUrl
-    
-    # Handle demo video requests
-    if source_url.startswith("demo://"):
-        # map demo url to local video file
-        import os
-        base_path = os.getcwd()
-        if "videos/p.mp4" in source_url:
-            source_url = os.path.join(base_path, "videos/p.mp4")
-        else:
-            source_url = os.path.join(base_path, "videos/p.mp4") # Default demo
-            
-    cap = cv2.VideoCapture(source_url)
-    if not cap.isOpened():
-        raise HTTPException(status_code=400, detail="Could not connect to camera stream")
-    
-    ret, frame = cap.read()
-    cap.release()
-    
-    if not ret:
-        raise HTTPException(status_code=500, detail="Could not read frame from camera")
-    
-    _, buffer = cv2.imencode('.jpg', frame)
-    return StreamingResponse(io.BytesIO(buffer.tobytes()), media_type="image/jpeg")
+@router.get("/{camera_id}", status_code=status.HTTP_200_OK)
+def get_camera(camera_id: str, db: Session = Depends(get_db)):
+    camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
+    if not camera:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
+    return format_camera_response(camera)
 
-@router.post("/", status_code=201)
-def create_camera(payload: CameraCreate, db=Depends(get_db)):
+
+@router.post("/", status_code=status.HTTP_201_CREATED)
+def create_camera(payload: CameraCreate, db: Session = Depends(get_db)):
     try:
-        camera_id = str(uuid.uuid4())
+        camera_id = generate_camera_id()
         new_camera = Camera(
             camera_id=camera_id,
             name=payload.name,
-            location=payload.location,
+            location=payload.zone,
             source=payload.sourceUrl,
             status=payload.status,
             created_at=datetime.utcnow()
         )
         db.add(new_camera)
-        
-        # Add Metadata
-        new_metadata = CameraMetadata(
-            camera_id=camera_id,
-            floor=payload.floor,
-            description=payload.description
-        )
-        db.add(new_metadata)
 
         # Add Module
-        new_module = CameraModule(
-            camera_id=camera_id,
-            module_name=payload.module
-        )
-        db.add(new_module)
+        if payload.module:
+            new_module = CameraModule(
+                camera_id=camera_id,
+                module_name=payload.module
+            )
+            db.add(new_module)
 
         # Add Features
         if payload.features:
@@ -156,40 +112,24 @@ def create_camera(payload: CameraCreate, db=Depends(get_db)):
         return {"message": "Camera created successfully", "camera_id": camera_id}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-@router.delete("/{camera_id}", status_code=204)
-def delete_camera(camera_id: str, db=Depends(get_db)):
+
+@router.put("/{camera_id}", status_code=status.HTTP_200_OK)
+def update_camera(camera_id: str, payload: CameraUpdate, db: Session = Depends(get_db)):
     camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
     if not camera:
-        raise HTTPException(status_code=404, detail="Camera not found")
-    try:
-        db.delete(camera)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.put("/{camera_id}", status_code=200)
-def update_camera(camera_id: str, payload: CameraCreate, db=Depends(get_db)):
-    camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
-    if not camera:
-        raise HTTPException(status_code=404, detail="Camera not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
     
     try:
         camera.name = payload.name
-        camera.location = payload.location
+        camera.location = payload.zone
         camera.source = payload.sourceUrl
         camera.status = payload.status
-        
-        if camera.metadata_info:
-            camera.metadata_info.floor = payload.floor
-            camera.metadata_info.description = payload.description
-        else:
-            db.add(CameraMetadata(camera_id=camera_id, floor=payload.floor, description=payload.description))
 
         db.query(CameraModule).filter(CameraModule.camera_id == camera_id).delete()
-        db.add(CameraModule(camera_id=camera_id, module_name=payload.module))
+        if payload.module:
+            db.add(CameraModule(camera_id=camera_id, module_name=payload.module))
 
         db.query(CameraFeature).filter(CameraFeature.camera_id == camera_id).delete()
         if payload.features:
@@ -209,7 +149,21 @@ def update_camera(camera_id: str, payload: CameraCreate, db=Depends(get_db)):
             ))
                 
         db.commit()
-        return {"message": "Camera updated successfully"}
+        return {"message": "Camera updated successfully", "camera_id": camera_id}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.delete("/{camera_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_camera(camera_id: str, db: Session = Depends(get_db)):
+    camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
+    if not camera:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
+    try:
+        db.delete(camera)
+        db.commit()
+        return None
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
