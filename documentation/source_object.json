@@ -1,0 +1,131 @@
+{
+  "version": "1.0",
+  "cameras": [
+    {
+      "camera_id": "CAM_001",
+      "camera_name": "Main Entrance Camera",
+
+      "source": {
+        "type": "rtsp",
+        "url": "rtsp://username:password@192.168.1.100:554/stream",
+        "file_path": null,
+        "device_index": null
+      },
+
+      "location": {
+        "building": "Main Building",
+        "floor": "Ground Floor",
+        "zone": "Main Entrance",
+        "description": "Camera covering the main entrance and reception area"
+      },
+
+      "video": {
+        "fps": 25,
+        "resolution": {
+          "width": 1920,
+          "height": 1080
+        }
+      },
+
+      "status": {
+        "enabled": true
+      },
+
+      "analytics": {
+        "vehicle_license_plate": {
+          "enabled": true,
+          "vehicle_detection": {
+            "enabled": true,
+            "classes": [
+              "car",
+              "motorcycle",
+              "bus",
+              "truck"
+            ],
+            "confidence_threshold": 0.50
+          },
+          "license_plate_detection": {
+            "enabled": true,
+            "confidence_threshold": 0.50,
+            "ocr_enabled": true
+          },
+          "vehicle_tracking": {
+            "enabled": true
+          }
+        },
+
+        "consumer_analytics": {
+          "enabled": true,
+
+          "line_crossing": {
+            "enabled": true,
+            "lines": []
+          },
+
+          "dwell_time": {
+            "enabled": true,
+            "threshold_seconds": 60
+          },
+
+          "heat_map": {
+            "enabled": true,
+            "update_interval_seconds": 10
+          },
+
+          "occupancy": {
+            "enabled": true,
+            "maximum_capacity": 100,
+            "alert_threshold_percentage": 90
+          },
+
+          "trends": {
+            "enabled": true,
+            "interval": "hourly",
+            "metrics": [
+              "entry_count",
+              "exit_count",
+              "occupancy",
+              "dwell_time"
+            ]
+          }
+        },
+
+        "fire_detection": {
+          "enabled": true,
+          "detect_fire": true,
+          "detect_smoke": true,
+          "confidence_threshold": 0.60,
+
+          "temporal_validation": {
+            "enabled": true,
+            "minimum_consecutive_frames": 3
+          },
+
+          "alert": {
+            "enabled": true,
+            "priority": "critical"
+          }
+        },
+
+        "weapon_detection": {
+          "enabled": true,
+          "classes": [
+            "gun",
+            "knife"
+          ],
+          "confidence_threshold": 0.70,
+
+          "temporal_validation": {
+            "enabled": true,
+            "minimum_consecutive_frames": 3
+          },
+
+          "alert": {
+            "enabled": true,
+            "priority": "critical"
+          }
+        }
+      }
+    }
+  ]
+}
