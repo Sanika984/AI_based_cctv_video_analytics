@@ -9,6 +9,8 @@ from app.models.camera import Camera
 from app.models.camera_module import CameraModule
 from app.models.camera_feature import CameraFeature
 from app.models.camera_in_out_config import CameraInOutConfig
+from app.models.user import User
+from app.core.security import get_current_user, require_role
 from app.schemas.camera import CameraCreate, CameraUpdate
 
 router = APIRouter()
@@ -53,13 +55,20 @@ def format_camera_response(c: Camera) -> dict:
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
-def get_cameras(db: Session = Depends(get_db)):
+def get_cameras(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     cams = db.query(Camera).all()
     return [format_camera_response(c) for c in cams]
 
 
 @router.get("/{camera_id}", status_code=status.HTTP_200_OK)
-def get_camera(camera_id: str, db: Session = Depends(get_db)):
+def get_camera(
+    camera_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
     if not camera:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
@@ -67,7 +76,11 @@ def get_camera(camera_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
-def create_camera(payload: CameraCreate, db: Session = Depends(get_db)):
+def create_camera(
+    payload: CameraCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
     try:
         camera_id = generate_camera_id()
         new_camera = Camera(
@@ -116,7 +129,12 @@ def create_camera(payload: CameraCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{camera_id}", status_code=status.HTTP_200_OK)
-def update_camera(camera_id: str, payload: CameraUpdate, db: Session = Depends(get_db)):
+def update_camera(
+    camera_id: str,
+    payload: CameraUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
     camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
     if not camera:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
@@ -156,7 +174,11 @@ def update_camera(camera_id: str, payload: CameraUpdate, db: Session = Depends(g
 
 
 @router.delete("/{camera_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_camera(camera_id: str, db: Session = Depends(get_db)):
+def delete_camera(
+    camera_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"]))
+):
     camera = db.query(Camera).filter(Camera.camera_id == camera_id).first()
     if not camera:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")

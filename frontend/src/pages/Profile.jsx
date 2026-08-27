@@ -1,140 +1,81 @@
 import React from 'react';
-import { Shield, Info, ChevronRight, UserCircle, History, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { LogOut, User, Shield } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Profile() {
-   return (
-      <div className="flex flex-col gap-10 w-full max-w-[1024px] animate-in fade-in transition-all pb-24">
-         
-         {/* Page Header */}
-         <div className="flex flex-col gap-2 w-full">
-            <h1 className="text-[30px] font-bold text-[#DEE5FF] tracking-[-0.75px] font-space leading-[36px]">
-               Account Settings
-            </h1>
-            <p className="text-[#91AAEB] font-inter text-[16px] leading-[24px]">
-               Manage your professional credentials and system security protocols.
-            </p>
-         </div>
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
 
-         {/* Bento Grid Layout */}
-         <div className="flex flex-col xl:flex-row gap-8 w-full">
-            
-            {/* Left Column */}
-            <div className="flex flex-col flex-[2] gap-8 min-w-[632px]">
-               
-               {/* Profile Overview Card */}
-               <div className="bg-[#06122D] border border-[rgba(43,70,128,0.05)] rounded-lg p-8 relative overflow-hidden flex flex-col gap-6 shadow-sm">
-                  {/* Watermark Icon */}
-                  <Shield 
-                     size={180} 
-                     className="absolute -right-6 -top-6 text-[#DEE5FF] opacity-5 rotate-12 pointer-events-none" 
-                     strokeWidth={1}
-                  />
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
 
-                  {/* Top section: Avatar + Info */}
-                  <div className="flex gap-8 relative z-10 w-full">
-                     {/* Avatar Box */}
-                     <div className="w-[128px] h-[128px] border-2 border-[rgba(78,222,163,0.2)] rounded-lg p-1 flex-shrink-0">
-                        <div className="w-full h-full bg-[#05183C] rounded flex items-center justify-center relative overflow-hidden">
-                           <UserCircle size={64} className="text-[#2B4680] absolute z-0" strokeWidth={1} />
-                        </div>
-                     </div>
+  const getRoleStyle = (role) => {
+    switch (role?.toLowerCase()) {
+      case 'admin':
+        return 'bg-[#4EDEA3]/10 text-[#4EDEA3] border-[#4EDEA3]/30';
+      case 'operator':
+        return 'bg-[#91AAEB]/10 text-[#91AAEB] border-[#91AAEB]/30';
+      default:
+        return 'bg-yellow-400/10 text-yellow-400 border-yellow-400/30';
+    }
+  };
 
-                     {/* Details */}
-                     <div className="flex flex-col flex-1">
-                        <div className="flex flex-col mb-6">
-                           <h2 className="text-[#DEE5FF] font-space font-bold text-[24px] leading-[32px]">Sarah Chen</h2>
-                           <div className="flex items-center gap-1.5 mt-1">
-                              <span className="text-[#91AAEB] font-inter text-[14px]">Employee ID:</span>
-                              <span className="text-[#DEE5FF] font-mono text-[14px]">SL-9942-B</span>
-                           </div>
-                        </div>
-
-                        {/* Detail Boxes */}
-                        <div className="flex flex-col sm:flex-row gap-4 w-full">
-                           <div className="bg-[#05183C] rounded-lg p-4 flex-1 flex flex-col justify-center gap-1">
-                              <span className="text-[#91AAEB] font-inter text-[10px] tracking-[0.5px] uppercase">Email Address</span>
-                              <span className="text-[#DEE5FF] font-inter font-medium text-[14px]">s.chen@sentinel-analytics.ai</span>
-                           </div>
-                           <div className="bg-[#05183C] rounded-lg p-4 flex-1 flex flex-col justify-center gap-1">
-                              <span className="text-[#91AAEB] font-inter text-[10px] tracking-[0.5px] uppercase">Direct Terminal</span>
-                              <span className="text-[#DEE5FF] font-inter font-medium text-[14px]">+1 (555) 012-9942</span>
-                           </div>
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* System Permissions Banner */}
-                  <div className="bg-[#05183C] rounded-lg px-5 py-4 flex justify-between items-center relative z-10 mt-2 hover:bg-[#05183C]/80 transition-colors cursor-pointer">
-                     <span className="text-[#91AAEB] font-inter text-[10px] tracking-[0.5px] uppercase">System Permissions</span>
-                     <Info size={18} className="text-[#91AAEB]" />
-                  </div>
-               </div>
-
-               {/* Activity Log / Allowed Cameras */}
-               <div className="bg-[#05183C] border border-[rgba(43,70,128,0.05)] rounded-lg flex flex-col overflow-hidden shadow-sm">
-                  {/* Header */}
-                  <div className="px-8 py-6 border-b border-[rgba(43,70,128,0.05)] flex items-center gap-2">
-                     <History size={18} className="text-[#FFB148]" />
-                     <h3 className="text-[#DEE5FF] font-space font-bold text-[18px]">Allowed Cameras</h3>
-                  </div>
-
-                  {/* Table */}
-                  <div className="flex flex-col w-full">
-                     <div className="flex bg-[#06122D] px-8 py-4">
-                        <div className="flex-[0.6] text-[#91AAEB] font-inter font-medium text-[10px] tracking-[1px] uppercase">Camera ID</div>
-                        <div className="flex-1 text-[#91AAEB] font-inter font-medium text-[10px] tracking-[1px] uppercase pl-4">Location / Terminal</div>
-                     </div>
-
-                     <div className="flex bg-[#05183C] px-8 py-4 border-b border-[rgba(43,70,128,0.05)] hover:bg-black/10 transition-colors">
-                        <div className="flex-[0.6] text-[#DEE5FF] font-inter text-[14px] flex items-center">CAM-0231</div>
-                        <div className="flex-1 text-[#DEE5FF] font-inter text-[14px] pl-4">Station-04-A (Main Floor)</div>
-                     </div>
-
-                     <div className="flex bg-[#06122D] px-8 py-4 border-b border-[rgba(43,70,128,0.05)] hover:bg-[#05183C]/50 transition-colors">
-                        <div className="flex-[0.6] text-[#DEE5FF] font-inter text-[14px] flex items-center">CAM-0284</div>
-                        <div className="flex-1 text-[#DEE5FF] font-inter text-[14px] pl-4">Mobile Device (Admin App)</div>
-                     </div>
-
-                     <div className="flex bg-[#05183C] px-8 py-4 border-b border-[rgba(43,70,128,0.05)] hover:bg-black/10 transition-colors">
-                        <div className="flex-[0.6] text-[#DEE5FF] font-inter text-[14px] flex items-center">CAM-1102</div>
-                        <div className="flex-1 text-[#DEE5FF] font-inter text-[14px] pl-4">Remote API Gateway</div>
-                     </div>
-
-                     <div className="flex bg-[#06122D] px-8 py-4 hover:bg-[#05183C]/50 transition-colors">
-                        <div className="flex-[0.6] text-[#DEE5FF] font-inter text-[14px] flex items-center">CAM-0099</div>
-                        <div className="flex-1 text-[#DEE5FF] font-inter text-[14px] pl-4">System Core</div>
-                     </div>
-                  </div>
-               </div>
-
-            </div>
-
-            {/* Right Column */}
-            <div className="flex flex-col gap-6 w-[304px] flex-shrink-0">
-               
-               {/* Account Actions */}
-               <div className="bg-[#05183C] border border-[rgba(43,70,128,0.05)] rounded-lg p-6 flex flex-col gap-6 shadow-sm">
-                  <div className="flex items-center gap-2">
-                     <ShieldCheck size={20} className="text-[#4EDEA3]" />
-                     <span className="text-[#DEE5FF] font-space font-bold text-[18px]">Account Actions</span>
-                  </div>
-
-                  <button className="bg-[#031D4B] hover:bg-[#031D4B]/60 transition-colors rounded items-center justify-between flex px-4 py-3 w-full border border-transparent hover:border-[#2B4680]/50 shadow-sm">
-                     <span className="text-[#DEE5FF] font-inter font-medium text-[14px]">Change Password</span>
-                     <ChevronRight size={14} className="text-[#DEE5FF]" />
-                  </button>
-               </div>
-
-               {/* Sign Out Card */}
-               <div className="bg-[rgba(127,41,39,0.1)] border border-[rgba(127,41,39,0.2)] rounded-lg p-6 flex shadow-sm">
-                  <button className="bg-[#EE7D77] hover:bg-[#EE7D77]/80 hover:scale-[0.98] transition-all rounded flex items-center justify-center w-full py-3 shadow-[0_4px_10px_rgba(238,125,119,0.1)]">
-                     <span className="text-[#490106] font-inter font-bold text-[14px] tracking-[1.4px] uppercase">Sign Out</span>
-                  </button>
-               </div>
-
-            </div>
-
-         </div>
+  return (
+    <div className="flex flex-col gap-6 w-full max-w-[600px] font-space pb-16">
+      <div>
+        <h1 className="text-2xl font-bold text-[#DEE5FF]">Account</h1>
+        <p className="text-xs text-[#91AAEB] mt-1">Manage your active session and credentials.</p>
       </div>
-   );
+
+      <div className="bg-[#05183C] border border-[rgba(43,70,128,0.2)] rounded-xl p-6 flex flex-col gap-6 shadow-sm">
+        
+        {/* User Info */}
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-[#020617] border border-white/10 flex items-center justify-center font-bold text-lg text-[#4EDEA3] uppercase">
+            {user?.username ? user.username[0] : 'U'}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-[#DEE5FF] capitalize">{user?.username}</h2>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border uppercase ${getRoleStyle(user?.role)}`}>
+                {user?.role}
+              </span>
+            </div>
+            <span className="text-xs font-mono text-[#91AAEB]/70">{user?.user_id}</span>
+          </div>
+        </div>
+
+        {/* Details Grid */}
+        <div className="grid grid-cols-2 gap-3 text-xs">
+          <div className="p-3 bg-[#020617] border border-white/5 rounded-lg flex flex-col gap-1">
+            <span className="text-[10px] font-mono uppercase text-[#91AAEB]">Status</span>
+            <span className="text-[#4EDEA3] font-mono font-medium flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#4EDEA3]" />
+              Active
+            </span>
+          </div>
+
+          <div className="p-3 bg-[#020617] border border-white/5 rounded-lg flex flex-col gap-1">
+            <span className="text-[10px] font-mono uppercase text-[#91AAEB]">Role Level</span>
+            <span className="text-[#DEE5FF] font-medium capitalize">{user?.role}</span>
+          </div>
+        </div>
+
+        {/* Sign Out Button */}
+        <div className="pt-4 border-t border-white/5 flex justify-end">
+          <button
+            onClick={handleSignOut}
+            className="px-4 py-2 rounded-lg bg-red-950/30 hover:bg-red-950/50 border border-red-500/30 text-red-300 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <LogOut size={14} />
+            <span>Sign Out</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
 }

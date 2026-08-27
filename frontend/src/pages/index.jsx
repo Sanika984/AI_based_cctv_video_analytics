@@ -12,7 +12,9 @@ export { default as ConsumerAnalytics } from './ConsumerAnalytics';
 export { default as LicensePlateDetection } from './LicensePlateDetection';
 export const SecurityAlerts = () => <PagePlaceholder title="Security Alerts" desc="Alerts Feed Placeholder" />;
 export { default as CameraConfig } from './CameraConfig';
+export { default as UserManagement } from './UserManagement';
 export { default as Profile } from './Profile';
+export { default as Login } from './Login';
 
 export const Support = () => <PagePlaceholder title="Support Helpdesk" desc="Documentation Placeholder" />;
 export const Logs = () => <PagePlaceholder title="System Logs" desc="Log View Placeholder" />;
