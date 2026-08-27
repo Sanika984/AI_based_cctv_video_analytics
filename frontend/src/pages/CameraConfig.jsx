@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCameras, addCamera, updateCamera, deleteCamera } from '../services/api';
 import {
-   Plus, Filter, Download, Activity, WifiOff,
+   Plus, Search, Filter, Download, Activity, WifiOff,
    ChevronLeft, ChevronRight, Info, Cpu, Settings2, Link,
    VideoOff, ArrowLeftRight, Clock, Map, Check, Flame, Crosshair, Edit2, Trash2, Camera as CameraIcon
 } from 'lucide-react';
@@ -24,6 +24,9 @@ export default function CameraConfig() {
    const queryClient = useQueryClient();
    const [isAdding, setIsAdding] = useState(false);
    const [editingCamera, setEditingCamera] = useState(null);
+   const [searchTerm, setSearchTerm] = useState('');
+   const [statusFilter, setStatusFilter] = useState('All');
+   const [zoneFilter, setZoneFilter] = useState('All');
 
    const { data: cameras, isLoading, isError } = useQuery({
       queryKey: ['cameras'],
@@ -44,6 +47,22 @@ export default function CameraConfig() {
    const activeCameras = cameras?.filter(c => c.status === 'Online') || [];
    const offlineCameras = cameras?.filter(c => c.status === 'Offline') || [];
    const totalCamerasCount = cameras?.length || 0;
+   const filteredCameras = cameras?.filter(camera => {
+      const search = searchTerm.toLowerCase();
+
+      const matchesSearch =
+         camera.camera_id?.toLowerCase().includes(search) ||
+         camera.name?.toLowerCase().includes(search) ||
+         camera.zone?.toLowerCase().includes(search);
+
+      const matchesStatus =
+         statusFilter === 'All' || camera.status === statusFilter;
+
+      const matchesZone =
+         zoneFilter === 'All' || camera.zone === zoneFilter;
+
+      return matchesSearch && matchesStatus && matchesZone;
+   }) || [];
 
    return (
       <div className="flex flex-col w-full max-w-[1024px] animate-in fade-in transition-all pb-24">
@@ -127,10 +146,50 @@ export default function CameraConfig() {
             {/* Header */}
             <div className="bg-[#031D4B] px-6 py-4 flex justify-between items-center border-b border-[rgba(43,70,128,0.1)] w-full">
                <h3 className="text-[#DEE5FF] font-space font-medium text-[16px]">Camera list</h3>
-               <div className="flex items-center gap-2">
-                  <button className="text-[#91AAEB] hover:text-[#DEE5FF] hover:bg-white/5 p-2 rounded transition-colors cursor-pointer" title="Filter">
-                     <Filter size={18} />
-                  </button>
+
+               <div className="flex items-center gap-3">
+
+                  {/* Search */}
+                  <div className="relative">
+                     <Search
+                        size={16}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6F87B5]"
+                     />
+
+                     <input
+                        type="text"
+                        placeholder="Search cameras..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-64 pl-9 pr-3 py-2 bg-[#061F4F] border border-[#1B3566] rounded-lg text-sm text-[#DEE5FF] placeholder-[#6F87B5] focus:outline-none focus:border-[#4F7CFF]"
+                     />
+                  </div>
+
+                  {/* Status Filter */}
+                  <select
+                     value={statusFilter}
+                     onChange={(e) => setStatusFilter(e.target.value)}
+                     className="px-3 py-2 bg-[#061F4F] border border-[#1B3566] rounded-lg text-sm text-[#DEE5FF] focus:outline-none focus:border-[#4F7CFF]"
+                  >
+                     <option value="All">All Status</option>
+                     <option value="Online">Online</option>
+                     <option value="Offline">Offline</option>
+                  </select>
+
+                  <select
+                     value={zoneFilter}
+                     onChange={(e) => setZoneFilter(e.target.value)}
+                     className="px-3 py-2 bg-[#061F4F] border border-[#1B3566] rounded-lg text-sm text-[#DEE5FF] focus:outline-none focus:border-[#4F7CFF]"
+                  >
+                     <option value="All">All Zones</option>
+                     {standardZones.map((zone) => (
+                        <option key={zone} value={zone}>
+                           {zone}
+                        </option>
+                     ))}
+                  </select>
+
+
                </div>
             </div>
 
@@ -163,7 +222,7 @@ export default function CameraConfig() {
                         <span className="text-[#91AAEB] font-inter text-[14px]">No cameras configured yet. Click "Add New Camera" to get started.</span>
                      </div>
                   )}
-                  {!isLoading && cameras?.map((camera, index) => {
+                  {!isLoading && filteredCameras?.map((camera, index) => {
                      const isOnline = camera.status === 'Online';
 
                      return (
@@ -176,16 +235,26 @@ export default function CameraConfig() {
                            status={camera.status}
                            onEdit={() => setEditingCamera(camera)}
                            onDelete={(id) => deleteMutation.mutate(id)}
-                           isLast={index === cameras.length - 1}
+                           isLast={index === filteredCameras.length - 1}
                         />
                      );
                   })}
+                  {!isLoading && filteredCameras.length === 0 && (
+                     <div className="py-12 text-center text-[#91AAEB]">
+                        <p className="text-sm font-medium text-[#DEE5FF]">
+                           No cameras found
+                        </p>
+                        <p className="text-xs mt-1">
+                           Try changing your search or filter.
+                        </p>
+                     </div>
+                  )}
                </div>
             </div>
 
             {/* Pagination Footer */}
             <div className="bg-[#031D4B] px-6 py-[14px] border-t border-[rgba(43,70,128,0.1)] flex justify-between items-center mt-auto">
-               <span className="text-[#91AAEB] font-inter text-[12px]">Showing <strong className="text-[#DEE5FF] font-medium">{cameras?.length || 0}</strong> {cameras?.length === 1 ? 'camera' : 'cameras'}</span>
+               <span className="text-[#91AAEB] font-inter text-[12px]">Showing <strong className="text-[#DEE5FF] font-medium">{filteredCameras?.length || 0}</strong> {filteredCameras?.length === 1 ? 'camera' : 'cameras'}</span>
                <div className="flex gap-1.5">
                   <button className="w-8 h-8 flex items-center justify-center bg-black rounded-sm border border-transparent hover:border-[#2B4680] text-[#8F9FB7] hover:text-[#DEE5FF] transition-all">
                      <ChevronLeft size={16} />
