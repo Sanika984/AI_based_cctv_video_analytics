@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function FeedCard({ title, cameraId = "default" }) {
+export default function FeedCard({ title, cameraId = "default", fps = 30 }) {
    return (
       <div className="bg-[#162C5D]/30 relative rounded-lg w-full h-full flex overflow-hidden border border-[rgba(43,70,128,0.2)]">
          {/* Live Stream Frame */}
@@ -20,9 +20,11 @@ export default function FeedCard({ title, cameraId = "default" }) {
             <span className="text-[#DEE5FF] font-inter font-medium text-[10px] uppercase tracking-wide">{title}</span>
          </div>
 
-         {/* Bottom Right Resolution */}
-         <div className="absolute bottom-4 right-4 z-10 bg-black/40 backdrop-blur px-2 py-1 rounded">
-            <span className="text-[#91AAEB] font-mono text-[10px]">1080P // MJPEG</span>
+         {/* Bottom Right FPS & Format Info */}
+         <div className="absolute bottom-4 right-4 z-10 bg-black/60 backdrop-blur px-2.5 py-1 rounded flex items-center gap-2 border border-white/5">
+            <span className="text-[#4EDEA3] font-mono text-[10px] font-semibold">{fps} FPS</span>
+            <span className="text-white/20 text-[10px]">|</span>
+            <span className="text-[#91AAEB] font-mono text-[10px]">MJPEG</span>
          </div>
       </div>
    )

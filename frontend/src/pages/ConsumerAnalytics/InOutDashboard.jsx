@@ -251,7 +251,7 @@ export default function InOutDashboard() {
                      )}
 
                      {/* Peak Point Decoration */}
-                     {!isLoadingHourly && peakData && (
+                     {!isLoadingHourly && peakData && hourlyStats?.length > 1 && hourlyStats.findIndex(s => s.hour === peakData.hour) !== -1 && (
                         <circle 
                             cx={(hourlyStats.findIndex(s => s.hour === peakData.hour) / (hourlyStats.length - 1)) * 400} 
                             cy={110 - (peakData.in_count / Math.max(...hourlyStats.map(st => st.in_count), 1) * 100)} 
@@ -263,7 +263,7 @@ export default function InOutDashboard() {
                   </svg>
 
                   {/* Tooltip mockup for Peak */}
-                  {!isLoadingHourly && peakData && peakData.in_count > 0 && (
+                  {!isLoadingHourly && peakData && peakData.in_count > 0 && hourlyStats?.length > 1 && hourlyStats.findIndex(s => s.hour === peakData.hour) !== -1 && (
                      <div 
                         className="absolute bg-[#00225A]/80 backdrop-blur-md border border-[#4EDEA3]/20 p-2 rounded shadow-lg flex flex-col pointer-events-none"
                         style={{

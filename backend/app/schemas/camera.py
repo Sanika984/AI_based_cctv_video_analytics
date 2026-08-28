@@ -17,6 +17,7 @@ class CameraBase(BaseModel):
     module: Optional[str] = "Consumer Analytics"
     features: Optional[Dict[str, bool]] = None
     status: Literal["Online", "Offline"] = "Offline"
+    processingFps: Optional[float] = 5.0
     inOutConfig: Optional[InOutConfigBase] = None
 
 
@@ -40,4 +41,5 @@ class CameraResponse(BaseModel):
     sourceUrl: str
     module: str
     features: Dict[str, bool]
+    processingFps: Optional[float] = 5.0
     inOutConfig: Optional[InOutConfigBase] = None

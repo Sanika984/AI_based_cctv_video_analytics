@@ -42,6 +42,9 @@ def format_camera_response(c: Camera) -> dict:
             "in_side": c.in_out_config.in_side
         }
 
+    from app.services.video_ingestion import ingestion_manager
+    fps = ingestion_manager.get_camera_fps(c.camera_id)
+
     return {
         "camera_id": c.camera_id,
         "name": c.name,
@@ -50,6 +53,7 @@ def format_camera_response(c: Camera) -> dict:
         "sourceUrl": c.source,
         "module": module_name,
         "features": features_dict,
+        "processingFps": fps,
         "inOutConfig": in_out_data
     }
 
@@ -122,6 +126,23 @@ def create_camera(
             ))
 
         db.commit()
+
+        if payload.status == "Online":
+            from app.services.video_ingestion import ingestion_manager, CameraConfig
+            clean_source = str(payload.sourceUrl).strip()
+            source_type = "webcam" if clean_source.isdigit() else ("rtsp" if clean_source.startswith(("rtsp://", "http://", "https://")) else "file")
+            cfg = CameraConfig(
+                camera_id=camera_id,
+                camera_name=payload.name,
+                source_type=source_type,
+                source_identifier=int(clean_source) if source_type == "webcam" else clean_source,
+                processing_fps=float(payload.processingFps or 5.0),
+                location=payload.zone,
+                enabled_features=payload.features or {},
+                loop_file=True
+            )
+            ingestion_manager.start_camera(cfg)
+
         return {"message": "Camera created successfully", "camera_id": camera_id}
     except Exception as e:
         db.rollback()
@@ -140,6 +161,10 @@ def update_camera(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
     
     try:
+        if camera.source != payload.sourceUrl:
+            from app.api.stream import stream_manager
+            stream_manager.stop_stream(f"cam_{camera_id}")
+
         camera.name = payload.name
         camera.location = payload.zone
         camera.source = payload.sourceUrl
@@ -167,6 +192,25 @@ def update_camera(
             ))
                 
         db.commit()
+
+        from app.services.video_ingestion import ingestion_manager, CameraConfig
+        if payload.status == "Online":
+            clean_source = str(payload.sourceUrl).strip()
+            source_type = "webcam" if clean_source.isdigit() else ("rtsp" if clean_source.startswith(("rtsp://", "http://", "https://")) else "file")
+            cfg = CameraConfig(
+                camera_id=camera_id,
+                camera_name=payload.name,
+                source_type=source_type,
+                source_identifier=int(clean_source) if source_type == "webcam" else clean_source,
+                processing_fps=float(payload.processingFps or 5.0),
+                location=payload.zone,
+                enabled_features=payload.features or {},
+                loop_file=True
+            )
+            ingestion_manager.start_camera(cfg)
+        else:
+            ingestion_manager.stop_camera(camera_id)
+
         return {"message": "Camera updated successfully", "camera_id": camera_id}
     except Exception as e:
         db.rollback()
@@ -183,6 +227,12 @@ def delete_camera(
     if not camera:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Camera not found")
     try:
+        from app.api.stream import stream_manager
+        stream_manager.stop_stream(f"cam_{camera_id}")
+
+        from app.services.video_ingestion import ingestion_manager
+        ingestion_manager.stop_camera(camera_id)
+
         db.delete(camera)
         db.commit()
         return None

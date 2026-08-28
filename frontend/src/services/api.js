@@ -160,4 +160,33 @@ export const getCameraSnapshot = async (sourceUrl) => {
   return data;
 };
 
+export const verifyStreamSource = async (sourceUrl) => {
+  const { data } = await api.post('/stream/test', { sourceUrl });
+  return data;
+};
+
+export const getPreviewStreamUrl = (sourceUrl) => {
+  const baseURL = api.defaults.baseURL || 'http://localhost:8000';
+  return `${baseURL}/stream/preview?source=${encodeURIComponent(sourceUrl)}`;
+};
+
+export const stopStream = async (payload = null) => {
+  try {
+    const body = typeof payload === 'string' ? { key: payload } : (payload || {});
+    const { data } = await api.post('/stream/stop', body);
+    return data;
+  } catch (err) {
+    return null;
+  }
+};
+
+export const getStreamStats = async () => {
+  try {
+    const { data } = await api.get('/stream/stats');
+    return data;
+  } catch (err) {
+    return null;
+  }
+};
+
 export default api;

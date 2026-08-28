@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCameras, addCamera, updateCamera, deleteCamera } from '../services/api';
+import { getCameras, addCamera, updateCamera, deleteCamera, verifyStreamSource, getPreviewStreamUrl, stopStream } from '../services/api';
 import {
-   Plus, Search, Filter, Download, Activity, WifiOff,
+   Plus, Search, Activity, WifiOff,
    ChevronLeft, ChevronRight, Info, Cpu, Settings2, Link,
-   VideoOff, ArrowLeftRight, Clock, Map, Check, Flame, Crosshair, Edit2, Trash2, Camera as CameraIcon
+   VideoOff, ArrowLeftRight, Clock, Map, Check, Flame, Crosshair, Edit2, Trash2, Camera as CameraIcon,
+   Play, RefreshCw, CheckCircle2, AlertCircle, Loader2, Video, Radio, Square, Sliders
 } from 'lucide-react';
 import LineSetupModal from '../components/LineSetupModal';
 
@@ -71,7 +72,6 @@ export default function CameraConfig() {
          <div className="flex justify-between items-center w-full mb-8">
             <div>
                <h1 className="text-[#DEE5FF] font-space font-bold text-[28px] tracking-tight">Camera Management</h1>
-               <p className="text-[#91AAEB] font-inter text-[13px] mt-1">Configure optical sensors and live analytics streams</p>
             </div>
             <button
                onClick={() => setIsAdding(true)}
@@ -275,6 +275,7 @@ export default function CameraConfig() {
 }
 
 
+
 const moduleFeatures = {
    'Consumer Analytics': [
       { id: 'IN / OUT count', label: 'IN / OUT count', icon: ArrowLeftRight },
@@ -288,18 +289,24 @@ const moduleFeatures = {
    ]
 };
 
-function AddCameraForm({ initialData, onCancel }) {
-   const queryClient = useQueryClient();
 
+function AddCameraForm({ initialData, onCancel, onSuccess }) {
+   const queryClient = useQueryClient();
+   const [name, setName] = useState(initialData?.name || '');
    const initZone = initialData?.zone || 'Entrance';
    const isCustomInitial = !standardZones.includes(initZone);
-
-   // Form States: Just Camera Name and Zone
-   const [name, setName] = useState(initialData?.name || '');
    const [zone, setZone] = useState(isCustomInitial ? 'Custom' : initZone);
    const [customZoneText, setCustomZoneText] = useState(isCustomInitial ? initZone : '');
-   const [sourceUrl, setSourceUrl] = useState(initialData?.sourceUrl || 'rtsp://admin:password@192.168.1.100:554/stream1');
+   const [sourceUrl, setSourceUrl] = useState(initialData?.sourceUrl || '');
    const [status, setStatus] = useState(initialData?.status || 'Online');
+   const [processingFps, setProcessingFps] = useState(initialData?.processingFps || 5);
+
+   // Stream Verification & Preview States
+   const [isCheckingStream, setIsCheckingStream] = useState(false);
+   const [streamVerified, setStreamVerified] = useState(false);
+   const [streamError, setStreamError] = useState(null);
+   const [streamInfo, setStreamInfo] = useState(null);
+   const [previewKey, setPreviewKey] = useState(Date.now());
 
    const [selectedModule, setSelectedModule] = useState(initialData?.module || 'Consumer Analytics');
 
@@ -316,15 +323,79 @@ function AddCameraForm({ initialData, onCancel }) {
 
    const isEditing = !!initialData;
 
+   // Ensure any active stream preview / hardware webcam capture is released when form closes/unmounts
+   useEffect(() => {
+      return () => {
+         stopStream();
+      };
+   }, []);
+
+   const handleStopPreview = () => {
+      setStreamVerified(false);
+      setStreamInfo(null);
+      setStreamError(null);
+      stopStream();
+   };
+
    const toggleFeature = (featureId) => {
       setFeaturesState(prev => ({ ...prev, [featureId]: !prev[featureId] }));
    };
 
    const currentFeatures = moduleFeatures[selectedModule] || [];
 
+   const handleTestStream = async (urlToTest = sourceUrl) => {
+      const cleanUrl = (urlToTest || '').trim();
+      if (!cleanUrl) {
+         setStreamError('Please enter a source URL, RTSP link, or webcam index (0).');
+         setStreamVerified(false);
+         setStreamInfo(null);
+         return;
+      }
+
+      setIsCheckingStream(true);
+      setStreamError(null);
+      setStreamVerified(false);
+
+      try {
+         const res = await verifyStreamSource(cleanUrl);
+         if (res.success) {
+            setStreamVerified(true);
+            setStreamInfo(res);
+            setPreviewKey(Date.now());
+         } else {
+            setStreamVerified(false);
+            setStreamError(res.message || 'Could not connect to camera stream.');
+            setStreamInfo(null);
+         }
+      } catch (err) {
+         setStreamVerified(false);
+         setStreamError(err.response?.data?.detail || 'Network error while connecting to camera stream.');
+         setStreamInfo(null);
+      } finally {
+         setIsCheckingStream(false);
+      }
+   };
+
+   const handleUseDemoVideo = () => {
+      const demoPath = 'data/videos/p.mp4';
+      setSourceUrl(demoPath);
+      if (streamVerified) {
+         handleStopPreview();
+      } else {
+         setStreamError(null);
+         setStreamInfo(null);
+      }
+   };
+
+   const handleFormCancel = () => {
+      handleStopPreview();
+      onCancel();
+   };
+
    const mutation = useMutation({
       mutationFn: isEditing ? updateCamera : addCamera,
       onSuccess: () => {
+         handleStopPreview();
          queryClient.invalidateQueries({ queryKey: ['cameras'] });
          onCancel();
       }
@@ -339,6 +410,7 @@ function AddCameraForm({ initialData, onCancel }) {
          module: selectedModule,
          features: featuresState,
          status,
+         processingFps: Number(processingFps) || 5,
          inOutConfig
       };
       if (isEditing) {
@@ -384,12 +456,12 @@ function AddCameraForm({ initialData, onCancel }) {
                         />
                      </div>
 
-                     {/* Zone / Area Dropdown */}
-                     <div className="flex flex-col gap-2.5 w-full md:w-[220px] shrink-0">
+                     {/* Location / Zone */}
+                     <div className="flex flex-col gap-2.5 w-full md:w-[220px]">
                         <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">
-                           Zone / Area
+                           Zone / Location
                         </label>
-                        <div className="relative flex items-center w-full group">
+                        <div className="relative flex items-center group">
                            <select
                               value={zone}
                               onChange={e => setZone(e.target.value)}
@@ -398,67 +470,203 @@ function AddCameraForm({ initialData, onCancel }) {
                               {standardZones.map(z => (
                                  <option key={z} value={z}>{z}</option>
                               ))}
-                              <option value="Custom">+ Custom Zone...</option>
+                              <option value="Custom">Custom Zone...</option>
                            </select>
                            <div className="absolute right-4 text-[#91AAEB] pointer-events-none group-focus-within:text-[#4EDEA3] transition-colors">
                               <ChevronRight size={14} className="rotate-90" />
                            </div>
                         </div>
-                        {zone === 'Custom' && (
-                           <input
-                              value={customZoneText}
-                              onChange={e => setCustomZoneText(e.target.value)}
-                              type="text"
-                              placeholder="Enter zone name"
-                              className="bg-black border border-[rgba(78,222,163,0.4)] rounded w-full h-[42px] px-4 mt-1 text-[13px] text-[#DEE5FF] font-inter placeholder:text-[#6B7280] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner"
-                           />
-                        )}
                      </div>
                   </div>
 
-                  {/* Status & Stream URL */}
-                  <div className="flex flex-col md:flex-row gap-6 w-full">
-                     {/* Stream URL */}
-                     <div className="flex flex-col gap-2.5 flex-1 w-full">
-                        <div className="flex justify-between items-center w-full">
-                           <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Source RTSP/HTTP URL</label>
-                           <button
-                              type="button"
-                              onClick={() => setSourceUrl('demo://videos/p.mp4')}
-                              className="text-[#4EDEA3] font-inter font-bold text-[10px] uppercase tracking-[1px] hover:underline cursor-pointer"
-                           >
-                              Use Demo Video
-                           </button>
-                        </div>
-                        <div className="relative flex items-center w-full group">
-                           <div className="absolute left-4 text-[#91AAEB] group-focus-within:text-[#4EDEA3] transition-colors"><Link size={14} /></div>
-                           <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} type="text" className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] pl-10 pr-4 text-[14px] text-[#6B7280] font-mono focus:text-[#DEE5FF] focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner" />
+                  {/* Custom Zone Field */}
+                  {zone === 'Custom' && (
+                     <div className="flex flex-col gap-2.5 w-full animate-in fade-in">
+                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">
+                           Custom Zone Name
+                        </label>
+                        <input
+                           value={customZoneText}
+                           onChange={e => setCustomZoneText(e.target.value)}
+                           type="text"
+                           placeholder="e.g. Storage Rooftop, Delivery Bay 3"
+                           className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 text-[14px] text-[#DEE5FF] font-inter focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner"
+                        />
+                     </div>
+                  )}
+
+                  {/* Initial Status */}
+                  <div className="flex flex-col gap-2.5 w-full">
+                     <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">
+                        Initial Status
+                     </label>
+                     <div className="relative flex items-center group">
+                        <select
+                           value={status}
+                           onChange={e => setStatus(e.target.value)}
+                           className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 pr-10 text-[14px] text-[#DEE5FF] font-inter focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner appearance-none cursor-pointer"
+                        >
+                           <option value="Online">Online</option>
+                           <option value="Offline">Offline</option>
+                        </select>
+                        <div className="absolute right-4 text-[#91AAEB] pointer-events-none group-focus-within:text-[#4EDEA3] transition-colors">
+                           <ChevronRight size={14} className="rotate-90" />
                         </div>
                      </div>
+                  </div>
 
-                     {/* Camera Status */}
-                     <div className="flex flex-col gap-2.5 w-full md:w-[160px] shrink-0">
-                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px]">Camera Status</label>
-                        <div className="relative flex items-center w-full group">
-                           <select
-                              value={status}
-                              onChange={e => setStatus(e.target.value)}
-                              className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] px-4 pr-10 text-[14px] text-[#DEE5FF] font-inter focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner appearance-none cursor-pointer"
+                  {/* Stream URL & Demo Action */}
+                  <div className="flex flex-col gap-3 w-full pt-2 border-t border-[rgba(43,70,128,0.15)]">
+                     <div className="flex flex-wrap justify-between items-center gap-2 w-full">
+                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px] flex items-center gap-2">
+                           <Radio size={14} className="text-[#4EDEA3]" />
+                           Source Feed URL / Path / Webcam
+                        </label>
+                        
+                        {/* Single Clean Demo Video Action */}
+                        <button
+                           type="button"
+                           onClick={handleUseDemoVideo}
+                           className={`px-3 py-1.5 rounded-md text-[12px] font-inter font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              sourceUrl === 'data/videos/p.mp4'
+                                 ? 'bg-[#004A31] text-[#4EDEA3] border border-[#4EDEA3]/50 shadow-sm'
+                                 : 'bg-[#00225A] text-[#DEE5FF] hover:bg-[#003080] border border-white/10 hover:border-[#4EDEA3]/40'
+                           }`}
+                           title="Fill demo video path (data/videos/p.mp4)"
+                        >
+                           <Video size={13} className="text-[#4EDEA3]" />
+                           <span>Use Demo Video</span>
+                        </button>
+                     </div>
+
+                     {/* Input and Test Button */}
+                     <div className="flex flex-col sm:flex-row gap-2.5 w-full">
+                        <div className="relative flex items-center flex-1 group">
+                           <div className="absolute left-4 text-[#91AAEB] group-focus-within:text-[#4EDEA3] transition-colors"><Link size={14} /></div>
+                           <input
+                              value={sourceUrl}
+                              onChange={e => {
+                                 setSourceUrl(e.target.value);
+                                 if (streamVerified) {
+                                    handleStopPreview();
+                                 } else {
+                                    setStreamError(null);
+                                    setStreamInfo(null);
+                                 }
+                              }}
+                              type="text"
+                              placeholder="0 for webcam, rtsp:// link, or click 'Use Demo Video'"
+                              className="bg-black border border-[rgba(43,70,128,0.2)] rounded w-full h-[46px] pl-10 pr-4 text-[14px] text-[#DEE5FF] font-mono focus:border-[#4EDEA3] focus:outline-none transition-colors shadow-inner"
+                           />
+                        </div>
+
+                        <button
+                           type="button"
+                           onClick={() => handleTestStream()}
+                           disabled={isCheckingStream}
+                           className={`h-[46px] px-5 rounded-lg font-inter font-bold text-[13px] flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0 ${
+                              streamVerified
+                                 ? 'bg-[#004A31] text-[#4EDEA3] border border-[#4EDEA3]/50 hover:bg-[#005c3d]'
+                                 : 'bg-[#4EDEA3] text-[#004A31] hover:bg-[#3dcd93] shadow-[0_2px_10px_rgba(78,222,163,0.2)]'
+                           } disabled:opacity-50`}
+                        >
+                           {isCheckingStream ? (
+                              <>
+                                 <Loader2 size={16} className="animate-spin text-current" />
+                                 <span>Verifying...</span>
+                              </>
+                           ) : streamVerified ? (
+                              <>
+                                 <CheckCircle2 size={16} className="text-[#4EDEA3]" />
+                                 <span>Verified & Live</span>
+                              </>
+                           ) : (
+                              <>
+                                 <Play size={15} className="fill-current" />
+                                 <span>Test & Preview</span>
+                              </>
+                           )}
+                        </button>
+                     </div>
+
+                     {/* Verification Feedback Banner */}
+                     {streamVerified && streamInfo && (
+                        <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 bg-[#002b1c] border border-[#4EDEA3]/30 rounded-md text-[12px] text-[#4EDEA3] font-inter animate-in fade-in">
+                           <div className="flex items-center gap-2.5">
+                              <CheckCircle2 size={16} className="shrink-0 text-[#4EDEA3]" />
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                 <span className="font-semibold">{streamInfo.message}</span>
+                                 <span className="bg-[#4EDEA3]/15 text-[#4EDEA3] px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase">
+                                    {streamInfo.sourceType}
+                                 </span>
+                                 <span className="bg-black/40 text-[#DEE5FF] px-2 py-0.5 rounded text-[10px] font-mono">
+                                    {streamInfo.resolution}
+                                 </span>
+                                 <span className="bg-black/40 text-[#4EDEA3] px-2 py-0.5 rounded text-[10px] font-mono font-semibold">
+                                    {streamInfo.fps ? `${streamInfo.fps} FPS` : '30 FPS'}
+                                 </span>
+                              </div>
+                           </div>
+                           <button
+                              type="button"
+                              onClick={handleStopPreview}
+                              className="px-2.5 py-1 bg-[#2a0b0b] hover:bg-[#3d1212] text-[#EE7D77] border border-[#EE7D77]/40 rounded text-[10px] font-inter font-semibold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                              title="Stop active preview stream and release webcam"
                            >
-                              <option value="Online">Online</option>
-                              <option value="Offline">Offline</option>
-                           </select>
-                           <div className="absolute right-4 text-[#91AAEB] pointer-events-none group-focus-within:text-[#4EDEA3] transition-colors">
-                              <ChevronRight size={14} className="rotate-90" />
+                              <Square size={10} className="fill-current" />
+                              <span>Stop Feed</span>
+                           </button>
+                        </div>
+                     )}
+
+                     {streamError && (
+                        <div className="flex items-start gap-2.5 px-3.5 py-2.5 bg-[#2a0b0b] border border-[#EE7D77]/40 rounded-md text-[12px] text-[#EE7D77] font-inter animate-in fade-in">
+                           <AlertCircle size={16} className="shrink-0 text-[#EE7D77] mt-0.5" />
+                           <div className="flex flex-col gap-0.5">
+                              <span className="font-semibold">Connection Check Failed</span>
+                              <span className="text-[#DEE5FF]/80 text-[11px]">{streamError}</span>
                            </div>
                         </div>
+                     )}
+                  </div>
+
+                  {/* Model Sampling Rate (3 Simple Options) */}
+                  <div className="flex flex-col gap-2.5 w-full pt-2 border-t border-[rgba(43,70,128,0.15)]">
+                     <div className="flex justify-between items-center">
+                        <label className="text-[#91AAEB] font-inter font-bold text-[12px] uppercase tracking-[0.6px] flex items-center gap-2">
+                           <Sliders size={14} className="text-[#4EDEA3]" />
+                           Model Sampling Rate
+                        </label>
+                        <span className="text-[#4EDEA3] font-mono text-[11px] font-semibold">{processingFps} FPS</span>
+                     </div>
+
+                     <div className="grid grid-cols-3 gap-2 w-full">
+                        {[
+                           { value: 2, label: '2 FPS', desc: 'Low' },
+                           { value: 5, label: '5 FPS', desc: 'Standard' },
+                           { value: 10, label: '10 FPS', desc: 'Fast' },
+                        ].map(opt => (
+                           <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setProcessingFps(opt.value)}
+                              className={`py-2 px-2.5 rounded border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                                 processingFps === opt.value
+                                    ? 'bg-[#004A31] border-[#4EDEA3] text-[#4EDEA3] shadow-sm'
+                                    : 'bg-black/30 border-[rgba(43,70,128,0.2)] text-[#8F9FB7] hover:border-[#4EDEA3]/30 hover:text-[#DEE5FF]'
+                              }`}
+                           >
+                              <span className="font-space font-bold text-[13px]">{opt.label}</span>
+                              <span className="text-[10px] font-inter opacity-75">{opt.desc}</span>
+                           </button>
+                        ))}
                      </div>
                   </div>
                </div>
 
                {/* Form Actions (Desktop) */}
                <div className="hidden lg:flex justify-end items-center gap-4 pt-4 mt-auto">
-                  <button onClick={onCancel} className="text-[#91AAEB] font-inter font-bold text-[14px] px-8 py-3 hover:text-[#DEE5FF] hover:bg-white/5 rounded transition-all cursor-pointer">
+                  <button onClick={handleFormCancel} className="text-[#91AAEB] font-inter font-bold text-[14px] px-8 py-3 hover:text-[#DEE5FF] hover:bg-white/5 rounded transition-all cursor-pointer">
                      Cancel
                   </button>
                   <button disabled={mutation.isPending} onClick={handleSave} className="bg-[#4EDEA3] text-[#004A31] font-inter font-bold text-[15px] px-10 py-3 rounded hover:bg-[#3dcd93] transition-colors shadow-[0_4px_15px_rgba(78,222,163,0.15)] truncate cursor-pointer">
@@ -559,20 +767,137 @@ function AddCameraForm({ initialData, onCancel }) {
                   />
                )}
 
-               {/* Preview Card */}
-               <div className="bg-black border border-[rgba(43,70,128,0.2)] rounded-lg min-h-[140px] flex flex-col justify-center items-center gap-2 overflow-hidden relative shadow-inner">
-                  <div
-                     className="absolute inset-0 opacity-[0.05]"
-                     style={{
-                        backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 1px, #fff 1px, #fff 2px)`
-                     }}
-                  ></div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black opacity-80"></div>
+               {/* Live Stream Preview Monitor Card */}
+               <div className="bg-[#05183C] border border-[rgba(43,70,128,0.2)] rounded-lg p-5 flex flex-col gap-3 shadow-sm">
+                  <div className="flex justify-between items-center w-full">
+                     <div className="flex items-center gap-2">
+                        <Video size={16} className="text-[#4EDEA3]" />
+                        <h4 className="text-[#DEE5FF] font-space font-semibold text-[14px] uppercase tracking-wide">Stream Preview</h4>
+                     </div>
+                     {streamVerified ? (
+                        <div className="flex items-center gap-2">
+                           <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#004A31] border border-[#4EDEA3]/40 rounded text-[10px] font-mono text-[#4EDEA3] font-bold tracking-wider">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#4EDEA3] animate-pulse"></span>
+                              LIVE
+                           </div>
+                           <button
+                              type="button"
+                              onClick={handleStopPreview}
+                              className="px-2 py-0.5 bg-[#2a0b0b] hover:bg-[#3d1212] text-[#EE7D77] border border-[#EE7D77]/40 rounded text-[10px] font-inter font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                              title="Stop Preview"
+                           >
+                              <Square size={9} className="fill-current" />
+                              <span>Stop</span>
+                           </button>
+                        </div>
+                     ) : isCheckingStream ? (
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 bg-[#3a2800] border border-[#E5A93C]/40 rounded text-[10px] font-mono text-[#E5A93C] font-bold tracking-wider">
+                           <span className="w-1.5 h-1.5 rounded-full bg-[#E5A93C] animate-ping"></span>
+                           TESTING
+                        </div>
+                     ) : (
+                        <span className="text-[#91AAEB]/50 font-mono text-[10px] uppercase">STANDBY</span>
+                     )}
+                  </div>
 
-                  <div className="flex flex-col justify-center items-center gap-1.5 z-10 w-full p-4 text-center">
-                     <VideoOff size={28} className="text-[#4EDEA3] mb-1" strokeWidth={1.5} />
-                     <span className="text-[#DEE5FF] font-inter font-bold text-[11px] tracking-[1.2px] uppercase">No Signal</span>
-                     <span className="text-[#91AAEB] font-inter text-[10px] leading-relaxed max-w-[80%] mx-auto">Preview activates on stream connection</span>
+                  {/* Monitor Screen Frame */}
+                  <div className="bg-black border border-[rgba(43,70,128,0.3)] rounded-lg min-h-[170px] max-h-[220px] flex flex-col justify-center items-center overflow-hidden relative shadow-inner">
+                     
+                     {/* Background Scanlines */}
+                     <div
+                        className="absolute inset-0 opacity-[0.04] pointer-events-none z-10"
+                        style={{
+                           backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 1px, #fff 1px, #fff 2px)`
+                        }}
+                     ></div>
+
+                     {streamVerified ? (
+                        <div className="relative w-full h-full flex items-center justify-center bg-black group">
+                           <img
+                              src={`${getPreviewStreamUrl(sourceUrl)}&t=${previewKey}`}
+                              alt="Stream Live Feed"
+                              className="w-full h-full max-h-[220px] object-cover"
+                              onError={() => {
+                                 setStreamVerified(false);
+                                 setStreamError("Stream video frame playback encountered an error.");
+                              }}
+                           />
+                           {/* HUD Overlay */}
+                           <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5">
+                              <span className="px-2 py-0.5 bg-black/75 backdrop-blur-sm border border-[#4EDEA3]/40 rounded text-[10px] font-mono text-[#4EDEA3] font-bold uppercase tracking-wider">
+                                 {streamInfo?.sourceType || 'ACTIVE FEED'}
+                              </span>
+                              {streamInfo?.resolution && (
+                                 <span className="px-2 py-0.5 bg-black/75 backdrop-blur-sm border border-white/10 rounded text-[10px] font-mono text-[#DEE5FF]">
+                                    {streamInfo.resolution}
+                                 </span>
+                              )}
+                              <span className="px-2 py-0.5 bg-black/75 backdrop-blur-sm border border-[#4EDEA3]/40 rounded text-[10px] font-mono text-[#4EDEA3] font-bold">
+                                 {streamInfo?.fps ? `${streamInfo.fps} FPS` : '30 FPS'}
+                              </span>
+                           </div>
+
+                           {/* Quick Action Buttons on Hover */}
+                           <div className="absolute bottom-2 right-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                              <button
+                                 type="button"
+                                 onClick={handleStopPreview}
+                                 className="px-2.5 py-1 bg-[#2a0b0b]/90 hover:bg-[#3d1212] text-[#EE7D77] border border-[#EE7D77]/40 rounded text-[11px] font-inter flex items-center gap-1.5 backdrop-blur-sm cursor-pointer transition-colors shadow-lg"
+                                 title="Stop preview stream"
+                              >
+                                 <Square size={11} className="fill-current" />
+                                 <span>Stop</span>
+                              </button>
+                              <button
+                                 type="button"
+                                 onClick={() => setPreviewKey(Date.now())}
+                                 className="px-2.5 py-1 bg-black/80 hover:bg-[#00225A] text-[#DEE5FF] hover:text-[#4EDEA3] border border-white/20 rounded text-[11px] font-inter flex items-center gap-1.5 backdrop-blur-sm cursor-pointer transition-colors shadow-lg"
+                                 title="Reload stream frame"
+                              >
+                                 <RefreshCw size={11} />
+                                 <span>Refresh</span>
+                              </button>
+                           </div>
+                        </div>
+                     ) : isCheckingStream ? (
+                        <div className="flex flex-col justify-center items-center gap-3 p-6 text-center z-10">
+                           <Loader2 size={30} className="text-[#4EDEA3] animate-spin" />
+                           <div className="flex flex-col gap-1">
+                              <span className="text-[#DEE5FF] font-inter font-bold text-[12px] tracking-wide uppercase">Connecting to Feed...</span>
+                              <span className="text-[#91AAEB] font-mono text-[10px]">Testing stream connection</span>
+                           </div>
+                        </div>
+                     ) : streamError ? (
+                        <div className="flex flex-col justify-center items-center gap-2 p-5 text-center z-10">
+                           <AlertCircle size={26} className="text-[#EE7D77]" />
+                           <span className="text-[#DEE5FF] font-inter font-bold text-[11px] tracking-wide uppercase">Signal Unavailable</span>
+                           <p className="text-[#91AAEB] font-inter text-[10px] leading-tight max-w-[90%] line-clamp-2">{streamError}</p>
+                           <button
+                              type="button"
+                              onClick={() => handleTestStream()}
+                              className="mt-1 px-3 py-1 bg-[#2a0b0b] hover:bg-[#3d1212] text-[#EE7D77] border border-[#EE7D77]/40 rounded text-[10px] font-inter font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+                           >
+                              <RefreshCw size={10} />
+                              <span>Retry Connection</span>
+                           </button>
+                        </div>
+                     ) : (
+                        <div className="flex flex-col justify-center items-center gap-2 p-5 text-center z-10">
+                           <VideoOff size={26} className="text-[#91AAEB]/60 mb-0.5" strokeWidth={1.5} />
+                           <span className="text-[#DEE5FF] font-inter font-bold text-[11px] tracking-[1.2px] uppercase">Standby Monitor</span>
+                           <span className="text-[#91AAEB] font-inter text-[10px] leading-relaxed max-w-[85%]">
+                              Enter <strong>0</strong> for webcam, an RTSP link, or click <strong>Use Demo Video</strong>, then click <strong>Test & Preview</strong>.
+                           </span>
+                           <button
+                              type="button"
+                              onClick={() => handleTestStream()}
+                              className="mt-1.5 px-3.5 py-1.5 bg-[#00225A] hover:bg-[#003080] text-[#4EDEA3] border border-[#4EDEA3]/30 rounded text-[11px] font-inter font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                           >
+                              <Play size={11} className="fill-current" />
+                              <span>Test Stream Now</span>
+                           </button>
+                        </div>
+                     )}
                   </div>
                </div>
 
@@ -583,7 +908,7 @@ function AddCameraForm({ initialData, onCancel }) {
                <button disabled={mutation.isPending} onClick={handleSave} className="bg-[#4EDEA3] text-[#004A31] w-full font-inter font-bold text-[16px] px-10 py-4 rounded hover:bg-[#3dcd93] transition-colors shadow-[0_4px_15px_rgba(78,222,163,0.15)] text-center cursor-pointer">
                   {mutation.isPending ? 'Saving...' : (isEditing ? 'Update Camera' : 'Save Camera')}
                </button>
-               <button onClick={onCancel} className="text-[#91AAEB] w-full font-inter font-bold text-[14px] px-8 py-4 hover:text-[#DEE5FF] hover:bg-white/5 rounded transition-all text-center cursor-pointer">
+               <button onClick={handleFormCancel} className="text-[#91AAEB] w-full font-inter font-bold text-[14px] px-8 py-4 hover:text-[#DEE5FF] hover:bg-white/5 rounded transition-all text-center cursor-pointer">
                   Cancel
                </button>
             </div>
