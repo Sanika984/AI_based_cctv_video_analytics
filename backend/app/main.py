@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import camera, analytics, users, stream, auth
+from app.api import camera, analytics, users, stream, auth, blacklisted_vehicles
 
 
 @asynccontextmanager
@@ -67,6 +67,11 @@ app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 app.include_router(camera.router, prefix="/cameras", tags=["cameras"])
 app.include_router(users.router, prefix="/users", tags=["users"])
 app.include_router(stream.router, prefix="/stream", tags=["stream"])
+app.include_router(
+    blacklisted_vehicles.router,
+    prefix="/blacklisted-vehicles",
+    tags=["blacklisted vehicles"]
+)
 
 @app.get("/")
 def root():
