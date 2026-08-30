@@ -189,4 +189,25 @@ export const getStreamStats = async () => {
   }
 };
 
+// Security Alerts & Live Detection Endpoints
+export const getAlerts = async (params = {}) => {
+  const { data } = await api.get('/analytics/alerts', { params });
+  return data;
+};
+
+export const acknowledgeAlert = async (alertId, username = 'Operator') => {
+  const { data } = await api.post(`/analytics/alerts/${alertId}/acknowledge`, { username });
+  return data;
+};
+
+export const getSecurityStatus = async () => {
+  try {
+    const { data } = await api.get('/analytics/security/status');
+    return data;
+  } catch (err) {
+    return {};
+  }
+};
+
 export default api;
+

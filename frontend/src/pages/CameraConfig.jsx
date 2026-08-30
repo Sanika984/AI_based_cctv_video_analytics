@@ -594,14 +594,8 @@ function AddCameraForm({ initialData, onCancel, onSuccess }) {
                         <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 bg-[#002b1c] border border-[#4EDEA3]/30 rounded-md text-[12px] text-[#4EDEA3] font-inter animate-in fade-in">
                            <div className="flex items-center gap-2.5">
                               <CheckCircle2 size={16} className="shrink-0 text-[#4EDEA3]" />
-                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                 <span className="font-semibold">{streamInfo.message}</span>
-                                 <span className="bg-[#4EDEA3]/15 text-[#4EDEA3] px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase">
-                                    {streamInfo.sourceType}
-                                 </span>
-                                 <span className="bg-black/40 text-[#DEE5FF] px-2 py-0.5 rounded text-[10px] font-mono">
-                                    {streamInfo.resolution}
-                                 </span>
+                              <div className="flex items-center gap-2">
+                                 <span className="font-semibold">Stream Verified & Active</span>
                                  <span className="bg-black/40 text-[#4EDEA3] px-2 py-0.5 rounded text-[10px] font-mono font-semibold">
                                     {streamInfo.fps ? `${streamInfo.fps} FPS` : '30 FPS'}
                                  </span>
@@ -823,15 +817,7 @@ function AddCameraForm({ initialData, onCancel, onSuccess }) {
                               }}
                            />
                            {/* HUD Overlay */}
-                           <div className="absolute top-2 left-2 z-20 flex items-center gap-1.5">
-                              <span className="px-2 py-0.5 bg-black/75 backdrop-blur-sm border border-[#4EDEA3]/40 rounded text-[10px] font-mono text-[#4EDEA3] font-bold uppercase tracking-wider">
-                                 {streamInfo?.sourceType || 'ACTIVE FEED'}
-                              </span>
-                              {streamInfo?.resolution && (
-                                 <span className="px-2 py-0.5 bg-black/75 backdrop-blur-sm border border-white/10 rounded text-[10px] font-mono text-[#DEE5FF]">
-                                    {streamInfo.resolution}
-                                 </span>
-                              )}
+                           <div className="absolute top-2.5 left-2.5 z-20 flex items-center gap-1.5">
                               <span className="px-2 py-0.5 bg-black/75 backdrop-blur-sm border border-[#4EDEA3]/40 rounded text-[10px] font-mono text-[#4EDEA3] font-bold">
                                  {streamInfo?.fps ? `${streamInfo.fps} FPS` : '30 FPS'}
                               </span>

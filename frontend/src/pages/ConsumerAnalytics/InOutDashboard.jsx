@@ -54,7 +54,12 @@ export default function InOutDashboard() {
                      </div>
                   ) : displayedCameras.length > 0 ? (
                      displayedCameras.map(camera => (
-                        <FeedCard key={camera.camera_id} title={camera.name} cameraId={camera.camera_id} />
+                        <FeedCard 
+                           key={camera.camera_id} 
+                           title={camera.name} 
+                           cameraId={camera.camera_id} 
+                           fps={camera.processingFps || 30}
+                        />
                      ))
                   ) : (
                      <div className="col-span-2 flex items-center justify-center h-full border border-dashed border-[rgba(43,70,128,0.3)] rounded-lg bg-[#06122D]">

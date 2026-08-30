@@ -9,6 +9,13 @@ from app.models.camera import Camera
 from app.models.camera_module import CameraModule
 from app.models.camera_feature import CameraFeature
 from app.models.camera_in_out_config import CameraInOutConfig
+from app.models.camera_metadata import CameraMetadata
+from app.models.alert import Alert
+from app.models.vehicle_log import VehicleLog
+from app.models.in_out_log import InOutLog
+from app.models.heatmap_point import HeatmapPoint
+from app.models.footfall_log import FootfallLog
+from app.models.person_event import PersonEvent
 from app.models.user import User
 from app.core.security import get_current_user, require_role
 from app.schemas.camera import CameraCreate, CameraUpdate
@@ -43,7 +50,11 @@ def format_camera_response(c: Camera) -> dict:
         }
 
     from app.services.video_ingestion import ingestion_manager
-    fps = ingestion_manager.get_camera_fps(c.camera_id)
+    fps = None
+    if c.status == "Online":
+        fps = ingestion_manager.get_camera_fps(c.camera_id)
+    if fps is None or fps <= 0:
+        fps = getattr(c, "processing_fps", None) or 5.0
 
     return {
         "camera_id": c.camera_id,
@@ -53,9 +64,10 @@ def format_camera_response(c: Camera) -> dict:
         "sourceUrl": c.source,
         "module": module_name,
         "features": features_dict,
-        "processingFps": fps,
+        "processingFps": float(fps),
         "inOutConfig": in_out_data
     }
+
 
 
 @router.get("/", status_code=status.HTTP_200_OK)
@@ -93,6 +105,7 @@ def create_camera(
             location=payload.zone,
             source=payload.sourceUrl,
             status=payload.status,
+            processing_fps=float(payload.processingFps or 5.0),
             created_at=datetime.utcnow()
         )
         db.add(new_camera)
@@ -169,6 +182,7 @@ def update_camera(
         camera.location = payload.zone
         camera.source = payload.sourceUrl
         camera.status = payload.status
+        camera.processing_fps = float(payload.processingFps or 5.0)
 
         db.query(CameraModule).filter(CameraModule.camera_id == camera_id).delete()
         if payload.module:
@@ -232,6 +246,21 @@ def delete_camera(
 
         from app.services.video_ingestion import ingestion_manager
         ingestion_manager.stop_camera(camera_id)
+
+        from app.services.fire_detection import security_cache
+        security_cache.remove_camera(camera_id)
+
+        # Explicitly clean up all related records
+        db.query(Alert).filter(Alert.camera_id == camera_id).delete()
+        db.query(VehicleLog).filter(VehicleLog.camera_id == camera_id).delete()
+        db.query(InOutLog).filter(InOutLog.camera_id == camera_id).delete()
+        db.query(HeatmapPoint).filter(HeatmapPoint.camera_id == camera_id).delete()
+        db.query(FootfallLog).filter(FootfallLog.camera_id == camera_id).delete()
+        db.query(PersonEvent).filter(PersonEvent.camera_id == camera_id).delete()
+        db.query(CameraModule).filter(CameraModule.camera_id == camera_id).delete()
+        db.query(CameraFeature).filter(CameraFeature.camera_id == camera_id).delete()
+        db.query(CameraInOutConfig).filter(CameraInOutConfig.camera_id == camera_id).delete()
+        db.query(CameraMetadata).filter(CameraMetadata.camera_id == camera_id).delete()
 
         db.delete(camera)
         db.commit()

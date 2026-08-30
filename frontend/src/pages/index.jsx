@@ -10,7 +10,7 @@ const PagePlaceholder = ({ title, desc }) => (
 export { default as LiveStream } from './LiveStream';
 export { default as ConsumerAnalytics } from './ConsumerAnalytics';
 export { default as LicensePlateDetection } from './LicensePlateDetection';
-export const SecurityAlerts = () => <PagePlaceholder title="Security Alerts" desc="Alerts Feed Placeholder" />;
+export { default as SecurityAlerts } from './SecurityAlerts';
 export { default as CameraConfig } from './CameraConfig';
 export { default as UserManagement } from './UserManagement';
 export { default as Profile } from './Profile';

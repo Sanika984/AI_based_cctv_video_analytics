@@ -126,3 +126,68 @@ def get_heatmap(db=Depends(get_db)):
         for d in data
     ]
 
+
+@router.get("/alerts")
+def get_security_alerts(
+    alert_type: str = None,
+    limit: int = 50,
+    db=Depends(get_db)
+):
+    from app.models.alert import Alert
+    from app.models.camera import Camera
+
+    query = db.query(Alert, Camera).outerjoin(Camera, Alert.camera_id == Camera.camera_id)
+    if alert_type and alert_type != "all":
+        query = query.filter(Alert.alert_type.ilike(f"%{alert_type}%"))
+
+    results = query.order_by(Alert.timestamp.desc()).limit(limit).all()
+
+    return [
+        {
+            "alert_id": alert.alert_id,
+            "camera_id": alert.camera_id,
+            "camera_name": camera.name if camera else alert.camera_id,
+            "location": camera.location if camera else "General",
+            "alert_type": alert.alert_type,
+            "severity": alert.severity,
+            "status": alert.status,
+            "reference_id": alert.reference_id,
+            "timestamp": alert.timestamp.isoformat() if alert.timestamp else None,
+            "acknowledged_by": alert.acknowledged_by,
+            "acknowledged_at": alert.acknowledged_at.isoformat() if alert.acknowledged_at else None
+        }
+        for alert, camera in results
+    ]
+
+
+@router.post("/alerts/{alert_id}/acknowledge")
+def acknowledge_alert(
+    alert_id: str,
+    payload: dict = None,
+    db=Depends(get_db)
+):
+    from app.models.alert import Alert
+    alert = db.query(Alert).filter(Alert.alert_id == alert_id).first()
+    if not alert:
+        return {"success": False, "message": "Alert not found"}
+
+    username = (payload and payload.get("username")) or "Operator"
+    alert.status = "Acknowledged"
+    alert.acknowledged_by = username
+    alert.acknowledged_at = datetime.now()
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Alert {alert_id} acknowledged by {username}",
+        "alert_id": alert_id,
+        "status": "Acknowledged"
+    }
+
+
+@router.get("/security/status")
+def get_security_status():
+    from app.services.fire_detection import security_cache
+    return security_cache.get_all_states()
+
+

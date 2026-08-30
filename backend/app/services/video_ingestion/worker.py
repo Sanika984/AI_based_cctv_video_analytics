@@ -205,23 +205,40 @@ class VideoIngestionWorker:
 
     def _consume_capture(self, capture: Any, stop_event: Event) -> bool:
         source_fps = float(capture.get(cv2.CAP_PROP_FPS)) if cv2 is not None else 0.0
-        if source_fps <= 0 or source_fps != source_fps:  # zero / NaN occur on live feeds
+        if source_fps <= 0 or source_fps != source_fps or source_fps > 120:  # zero / NaN occur on live feeds
             source_fps = self.camera.source_fps_fallback
             self.log.warning("Source FPS unavailable: camera=%s; using fallback=%s", self.camera.camera_id, source_fps)
+        
         sampler = FrameSampler(source_fps, self.camera.processing_fps)
         frame_number = 0
+        frame_interval = 1.0 / source_fps
+        last_frame_time = time.monotonic()
+        is_file = self.camera.source_type == "file"
 
         while not stop_event.is_set():
+            if is_file:
+                now = time.monotonic()
+                sleep_duration = frame_interval - (now - last_frame_time)
+                if sleep_duration > 0:
+                    if stop_event.wait(sleep_duration):
+                        break
+                last_frame_time = time.monotonic()
+
             ok, frame = capture.read()
             if not ok or frame is None:
-                if self.camera.source_type == "file" and not self.camera.loop_file:
+                if is_file and self.camera.loop_file:
+                    capture.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    continue
+                if is_file and not self.camera.loop_file:
                     self.log.info("Recorded video finished: camera=%s", self.camera.camera_id)
                     return False
                 self.log.warning("Source unavailable while reading: camera=%s", self.camera.camera_id)
                 return True
+
             frame_number += 1
             if not sampler.take(frame_number):
                 continue
+
             payload = self._build_payload(frame, frame_number, source_fps)
             self.log.debug("Frame sampled: camera=%s frame=%s", self.camera.camera_id, frame_number)
             self._put(payload)
@@ -251,7 +268,13 @@ class VideoIngestionWorker:
             self.raw_frame_queue.put(payload, timeout=self.queue_timeout_seconds)
             self.log.debug("Frame pushed to raw queue: camera=%s frame=%s", self.camera.camera_id, payload["frame_number"])
         except queue_module.Full:
-            self.log.warning("Raw frame queue full; dropping sampled frame: camera=%s frame=%s", self.camera.camera_id, payload["frame_number"])
+            try:
+                # Maintain real-time freshness by dropping the oldest stale frame
+                self.raw_frame_queue.get_nowait()
+                self.raw_frame_queue.put_nowait(payload)
+                self.log.warning("Raw frame queue full; dropped oldest frame for camera=%s", self.camera.camera_id)
+            except Exception:
+                self.log.warning("Raw frame queue full; dropping sampled frame: camera=%s frame=%s", self.camera.camera_id, payload["frame_number"])
 
     def _wait_to_reconnect(self, stop_event: Event) -> None:
         self.log.info("Reconnection attempt scheduled: camera=%s delay=%ss", self.camera.camera_id, self.camera.reconnect_delay_seconds)

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Menu } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
+import InAppNotification from './components/InAppNotification';
 import { AuthProvider } from './context/AuthContext';
 import {
   LiveStream,
@@ -24,6 +25,7 @@ function DashboardLayout() {
   return (
     <div className="min-h-screen bg-brand-bg flex text-brand-muted font-space overflow-hidden">
       <Sidebar isCollapsed={isCollapsed} />
+      <InAppNotification />
 
       {/* Main Content Area */}
       <main className={`flex-1 transition-all duration-300 ${isCollapsed ? 'ml-20' : 'ml-64'} flex flex-col h-screen`}>

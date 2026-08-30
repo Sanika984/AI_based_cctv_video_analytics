@@ -112,7 +112,7 @@ def test_stream_connection(payload: SnapshotRequest):
         source_type = get_source_type_label(source_url)
         return {
             "success": True,
-            "message": f"{source_type} stream active and verified!",
+            "message": "Stream active and verified",
             "resolution": f"{w}x{h}",
             "fps": round(source_fps, 1),
             "sourceType": source_type
@@ -177,9 +177,6 @@ async def preview_stream(source: str, request: Request):
 
 async def generate_preview_frames(source_resolved, request: Request, stop_event: asyncio.Event):
     cap = await asyncio.to_thread(cv2.VideoCapture, source_resolved)
-    fps_timer = time.time()
-    fps_counter = 0
-    live_fps = 30.0
 
     try:
         if not cap.isOpened():
@@ -187,41 +184,40 @@ async def generate_preview_frames(source_resolved, request: Request, stop_event:
                 yield chunk
             return
 
+        source_fps = float(cap.get(cv2.CAP_PROP_FPS))
+        if source_fps <= 0 or source_fps != source_fps or source_fps > 120:
+            source_fps = 30.0
+        frame_interval = 1.0 / source_fps
+        is_file = isinstance(source_resolved, str) and os.path.exists(source_resolved)
+
         while not stop_event.is_set():
             if await request.is_disconnected():
                 break
 
+            start_t = time.monotonic()
             ret, frame = await asyncio.to_thread(cap.read)
-            if not ret:
-                if isinstance(source_resolved, str) and os.path.exists(source_resolved):
+            if not ret or frame is None:
+                if is_file:
                     await asyncio.to_thread(cap.set, cv2.CAP_PROP_POS_FRAMES, 0)
-                    await asyncio.sleep(0.04)
                     continue
                 else:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.05)
                     continue
-            
-            # Measure Live FPS
-            fps_counter += 1
-            now = time.time()
-            if now - fps_timer >= 0.5:
-                live_fps = fps_counter / (now - fps_timer)
-                fps_counter = 0
-                fps_timer = now
 
             h, w = frame.shape[:2]
             display_w = 640
             display_h = int(h * (display_w / w)) if w > 0 else 360
             frame = cv2.resize(frame, (display_w, display_h))
             
-            cv2.putText(frame, "LIVE PREVIEW", (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (78, 222, 163), 2)
-            cv2.putText(frame, f"{live_fps:.0f} FPS", (display_w - 90, display_h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (78, 222, 163), 1, cv2.LINE_AA)
-            
             ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
             if not ret:
                 continue
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            await asyncio.sleep(0.033)
+
+            # Real-time clock pacing
+            elapsed = time.monotonic() - start_t
+            sleep_time = max(0.001, frame_interval - elapsed) if is_file else 0.01
+            await asyncio.sleep(sleep_time)
     except (asyncio.CancelledError, GeneratorExit, Exception):
         pass
     finally:
@@ -264,9 +260,6 @@ async def generate_counting_frames(video_path, p1, p2, in_side_orient, camera_id
     counted_ids = set()
     session_in = 0
     session_out = 0
-    fps_timer = time.time()
-    fps_counter = 0
-    live_fps = 30.0
 
     try:
         if not cap.isOpened():
@@ -274,26 +267,25 @@ async def generate_counting_frames(video_path, p1, p2, in_side_orient, camera_id
                 yield chunk
             return
 
+        source_fps = float(cap.get(cv2.CAP_PROP_FPS))
+        if source_fps <= 0 or source_fps != source_fps or source_fps > 120:
+            source_fps = 30.0
+        frame_interval = 1.0 / source_fps
+        is_file = isinstance(video_path, str) and os.path.exists(video_path)
+
         while not stop_event.is_set():
             if await request.is_disconnected():
                 break
 
+            start_t = time.monotonic()
             ret, frame = await asyncio.to_thread(cap.read)
-            if not ret:
-                if isinstance(video_path, str) and os.path.exists(video_path):
+            if not ret or frame is None:
+                if is_file:
                     await asyncio.to_thread(cap.set, cv2.CAP_PROP_POS_FRAMES, 0)
-                    await asyncio.sleep(0.04)
                     continue
                 else:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.05)
                     continue
-            
-            fps_counter += 1
-            now = time.time()
-            if now - fps_timer >= 0.5:
-                live_fps = fps_counter / (now - fps_timer)
-                fps_counter = 0
-                fps_timer = now
 
             # Get REAL original dimensions
             orig_h, orig_w = frame.shape[:2]
@@ -345,19 +337,21 @@ async def generate_counting_frames(video_path, p1, p2, in_side_orient, camera_id
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (78, 222, 163), 2)
 
             # Draw Line
-            cv2.line(frame, line_p1, line_p2, (0, 255, 255), 4)
+            cv2.line(frame, line_p1, line_p2, (0, 255, 255), 3)
             
-            # Visual Indicators
-            cv2.putText(frame, f"IN: {session_in}", (30, 50), cv2.FONT_HERSHEY_DUPLEX, 1.0, (78, 222, 163), 2)
-            cv2.putText(frame, f"OUT: {session_out}", (30, 100), cv2.FONT_HERSHEY_DUPLEX, 1.0, (238, 125, 119), 2)
-            cv2.putText(frame, "AI ANALYTICS ACTIVE", (display_w - 250, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-            cv2.putText(frame, f"{live_fps:.0f} FPS", (display_w - 100, display_h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (78, 222, 163), 1, cv2.LINE_AA)
+            # Clean Visual Indicators
+            cv2.putText(frame, f"IN: {session_in}", (30, 45), cv2.FONT_HERSHEY_DUPLEX, 0.9, (78, 222, 163), 2)
+            cv2.putText(frame, f"OUT: {session_out}", (30, 85), cv2.FONT_HERSHEY_DUPLEX, 0.9, (238, 125, 119), 2)
 
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:
                 continue
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            await asyncio.sleep(0.04)
+            
+            # Real-time clock pacing
+            elapsed = time.monotonic() - start_t
+            sleep_time = max(0.001, frame_interval - elapsed) if is_file else 0.01
+            await asyncio.sleep(sleep_time)
     except (asyncio.CancelledError, GeneratorExit, Exception):
         pass
     finally:
@@ -384,7 +378,7 @@ async def video_stream(camera_id: str, request: Request, db=Depends(get_db)):
                 media_type="multipart/x-mixed-replace; boundary=frame"
             )
         return StreamingResponse(
-            generate_simple_file_frames(video_path, request, stop_event),
+            generate_simple_file_frames(video_path, request, stop_event, camera_id=camera_id),
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
 
@@ -393,11 +387,9 @@ async def video_stream(camera_id: str, request: Request, db=Depends(get_db)):
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
-async def generate_simple_file_frames(video_path, request: Request, stop_event: asyncio.Event):
+async def generate_simple_file_frames(video_path, request: Request, stop_event: asyncio.Event, camera_id: str = None):
     cap = await asyncio.to_thread(cv2.VideoCapture, video_path)
-    fps_timer = time.time()
-    fps_counter = 0
-    live_fps = 30.0
+    from app.services.fire_detection import security_cache
 
     try:
         if not cap.isOpened():
@@ -405,38 +397,55 @@ async def generate_simple_file_frames(video_path, request: Request, stop_event: 
                 yield chunk
             return
 
+        source_fps = float(cap.get(cv2.CAP_PROP_FPS))
+        if source_fps <= 0 or source_fps != source_fps or source_fps > 120:
+            source_fps = 30.0
+        frame_interval = 1.0 / source_fps
+        is_file = isinstance(video_path, str) and os.path.exists(video_path)
+
         while not stop_event.is_set():
             if await request.is_disconnected():
                 break
 
+            start_t = time.monotonic()
             ret, frame = await asyncio.to_thread(cap.read)
-            if not ret:
-                if isinstance(video_path, str) and os.path.exists(video_path):
+            if not ret or frame is None:
+                if is_file:
                     await asyncio.to_thread(cap.set, cv2.CAP_PROP_POS_FRAMES, 0)
-                    await asyncio.sleep(0.04)
                     continue
                 else:
-                    await asyncio.sleep(0.1)
+                    await asyncio.sleep(0.05)
                     continue
-
-            fps_counter += 1
-            now = time.time()
-            if now - fps_timer >= 0.5:
-                live_fps = fps_counter / (now - fps_timer)
-                fps_counter = 0
-                fps_timer = now
 
             h, w = frame.shape[:2]
             display_w = 800
             display_h = int(h * (display_w / w)) if w > 0 else 450
             frame = cv2.resize(frame, (display_w, display_h))
-            cv2.putText(frame, "LIVE FEED", (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (78, 222, 163), 2)
-            cv2.putText(frame, f"{live_fps:.0f} FPS", (display_w - 100, display_h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (78, 222, 163), 1, cv2.LINE_AA)
+            
+            # Check security state for live fire/threat detection visual overlay
+            if camera_id:
+                state = security_cache.get_camera_state(camera_id)
+                if state and state.get("fire_detected"):
+                    scale_x = display_w / w if w > 0 else 1.0
+                    scale_y = display_h / h if h > 0 else 1.0
+                    for box in state.get("boxes", []):
+                        bx1, by1, bx2, by2 = int(box[0] * scale_x), int(box[1] * scale_y), int(box[2] * scale_x), int(box[3] * scale_y)
+                        cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 69, 255), 2)
+                        cv2.putText(frame, "FIRE DETECTED", (bx1, max(18, by1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 69, 255), 2)
+
+                    if state.get("is_active_alert"):
+                        cv2.rectangle(frame, (display_w - 200, 15), (display_w - 20, 50), (0, 0, 180), -1)
+                        cv2.putText(frame, "CRITICAL ALERT", (display_w - 190, 38), cv2.FONT_HERSHEY_DUPLEX, 0.6, (255, 255, 255), 1)
+
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:
                 continue
             yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            await asyncio.sleep(0.04)
+            
+            # Real-time clock pacing
+            elapsed = time.monotonic() - start_t
+            sleep_time = max(0.001, frame_interval - elapsed) if is_file else 0.01
+            await asyncio.sleep(sleep_time)
     except (asyncio.CancelledError, GeneratorExit, Exception):
         pass
     finally:
