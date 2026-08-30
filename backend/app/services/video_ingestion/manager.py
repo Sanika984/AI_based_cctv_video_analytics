@@ -1,11 +1,10 @@
-"""Ingestion Manager to coordinate camera workers and central raw frame queue."""
-
 from __future__ import annotations
 
 import logging
+import queue as queue_module
 from queue import Queue
-from threading import Event, Thread
-from typing import Any, Dict, Optional
+from threading import Event, Lock, Thread
+from typing import Any, Dict, List, Optional
 
 from .worker import CameraConfig, VideoIngestionWorker
 
@@ -17,6 +16,8 @@ class IngestionManager:
 
     def __init__(self, max_queue_size: int = 500) -> None:
         self.raw_frame_queue: Queue[dict[str, Any]] = Queue(maxsize=max_queue_size)
+        self._subscribers: List[Queue[dict[str, Any]]] = []
+        self._sub_lock = Lock()
         self._workers: Dict[str, VideoIngestionWorker] = {}
         self._threads: Dict[str, Thread] = {}
         self._stop_events: Dict[str, Event] = {}
@@ -26,12 +27,47 @@ class IngestionManager:
         """Return the shared raw frame queue consumed by AI analytics models."""
         return self.raw_frame_queue
 
+    def subscribe(self, maxsize: int = 300) -> Queue[dict[str, Any]]:
+        """Register a new downstream subscriber queue to receive raw frames."""
+        q: Queue[dict[str, Any]] = Queue(maxsize=maxsize)
+        with self._sub_lock:
+            self._subscribers.append(q)
+        return q
+
+    def unsubscribe(self, q: Queue[dict[str, Any]]) -> None:
+        """Unregister a subscriber queue."""
+        with self._sub_lock:
+            if q in self._subscribers:
+                self._subscribers.remove(q)
+
+    def broadcast_frame(self, payload: dict[str, Any]) -> None:
+        """Deliver a sampled frame payload to central queue and all active subscribers."""
+        try:
+            self.raw_frame_queue.put_nowait(payload)
+        except queue_module.Full:
+            try:
+                self.raw_frame_queue.get_nowait()
+                self.raw_frame_queue.put_nowait(payload)
+            except Exception:
+                pass
+
+        with self._sub_lock:
+            for sub_q in list(self._subscribers):
+                try:
+                    sub_q.put_nowait(payload)
+                except queue_module.Full:
+                    try:
+                        sub_q.get_nowait()
+                        sub_q.put_nowait(payload)
+                    except Exception:
+                        pass
+
     def start_camera(self, config: CameraConfig) -> None:
         """Start or restart an ingestion worker for the given camera configuration."""
         self.stop_camera(config.camera_id)
 
         stop_event = Event()
-        worker = VideoIngestionWorker(config, self.raw_frame_queue)
+        worker = VideoIngestionWorker(config, self.raw_frame_queue, broadcast_fn=self.broadcast_frame)
         thread = Thread(
             target=worker.run,
             args=(stop_event,),

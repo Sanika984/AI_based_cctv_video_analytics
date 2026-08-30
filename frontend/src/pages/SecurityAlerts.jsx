@@ -351,22 +351,27 @@ export default function SecurityAlerts() {
               </div>
               <div>
                 <h3 className="text-[#DEE5FF] font-space font-bold text-[18px] uppercase tracking-wide">
-                  Weapon Detection
+                  Armed Threat & Weapon Detection
                 </h3>
               </div>
             </div>
 
-            <span className="px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider bg-[#004A31] text-[#4EDEA3] border border-[#4EDEA3]/30 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#4EDEA3]" />
-              CLEAR
-            </span>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-[11px] font-mono font-bold uppercase tracking-wider border flex items-center gap-1.5 ${activeWeaponAlerts.length > 0 || Object.values(securityStatus || {}).some(s => s.weapon_detected)
+                ? 'bg-yellow-500/20 text-[#E5A93C] border-yellow-500/40 animate-pulse'
+                : 'bg-[#004A31] text-[#4EDEA3] border-[#4EDEA3]/30'
+                }`}>
+                <span className={`w-2 h-2 rounded-full ${activeWeaponAlerts.length > 0 || Object.values(securityStatus || {}).some(s => s.weapon_detected) ? 'bg-yellow-500' : 'bg-[#4EDEA3]'}`} />
+                {activeWeaponAlerts.length > 0 || Object.values(securityStatus || {}).some(s => s.weapon_detected) ? 'CRITICAL THREAT ACTIVE' : 'MONITORING NORMAL'}
+              </span>
+            </div>
           </div>
 
           {/* Weapon Feeds Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[200px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[220px]">
             {isLoadingCameras ? (
               <div className="col-span-2 flex items-center justify-center py-12 text-[#91AAEB]">
-                Loading ...
+                Loading weapon detection feeds...
               </div>
             ) : weaponCameras.length > 0 ? (
               weaponCameras.map((cam) => (
@@ -376,16 +381,114 @@ export default function SecurityAlerts() {
                     title={cam.name}
                     fps={cam.processingFps || 5}
                   />
+                  {/* Real-time Weapon Threat Badge overlay */}
+                  {securityStatus?.[cam.camera_id]?.weapon_detected && (
+                    <div className="absolute top-3.5 right-3.5 z-20 px-2.5 py-1 bg-amber-600/90 backdrop-blur-md text-white text-[10px] font-mono font-bold rounded border border-amber-400 animate-bounce flex items-center gap-1">
+                      <ShieldAlert size={12} />
+                      <span>{securityStatus?.[cam.camera_id]?.threat_class?.toUpperCase() || 'WEAPON'} DETECTED</span>
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
               <div className="col-span-2 flex flex-col items-center justify-center py-10 px-4 bg-[#06122D]/60 border border-dashed border-[rgba(43,70,128,0.25)] rounded-lg text-center gap-3">
                 <Shield size={32} className="text-[#91AAEB]/40" />
                 <span className="text-[#DEE5FF] font-inter font-semibold text-[14px]">
-                  No cameras
+                  No cameras configured for Weapon Detection
+                </span>
+                <span className="text-[#91AAEB] font-inter text-[12px] max-w-[360px]">
+                  Enable &apos;Weapon detection&apos; under Security analytics in Camera Management to start monitoring armed threats.
                 </span>
               </div>
             )}
+          </div>
+
+          {/* Weapon Incident Logs Table */}
+          <div className="flex flex-col gap-2 mt-2 pt-4 border-t border-[rgba(43,70,128,0.15)]">
+            <div className="flex justify-between items-center">
+              <span className="text-[#DEE5FF] font-space font-semibold text-[13px] uppercase tracking-wider">
+                Recent Weapon Alerts
+              </span>
+              <span className="text-[#91AAEB] font-mono text-[11px]">
+                {weaponAlerts.length} recorded events
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[12px] font-inter">
+                <thead>
+                  <tr className="bg-[#06122D] text-[#91AAEB] border-b border-[rgba(43,70,128,0.15)] uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Alert ID</th>
+                    <th className="py-2.5 px-3">Camera / Area</th>
+                    <th className="py-2.5 px-3">Details</th>
+                    <th className="py-2.5 px-3">Severity</th>
+                    <th className="py-2.5 px-3">Time</th>
+                    <th className="py-2.5 px-3">Status</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[rgba(43,70,128,0.08)]">
+                  {weaponAlerts.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-6 text-[#91AAEB]/60 italic">
+                        No weapon detection incidents recorded.
+                      </td>
+                    </tr>
+                  ) : (
+                    weaponAlerts.slice(0, 5).map((a) => {
+                      const isActive = a.status?.toLowerCase() === 'active';
+                      return (
+                        <tr key={a.alert_id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-2.5 px-3 font-mono font-bold text-[#DEE5FF]">
+                            {a.alert_id}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-[#DEE5FF]">{a.camera_name}</span>
+                              <span className="text-[#91AAEB] text-[11px]">{a.location}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-[#91AAEB] font-mono text-[11px] max-w-[180px] truncate">
+                            {a.reference_id || 'Armed Threat'}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-yellow-500/20 text-[#E5A93C] border border-yellow-500/30">
+                              {a.severity}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-[#91AAEB] font-mono text-[11px]">
+                            {a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '-'}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${isActive
+                              ? 'bg-yellow-500/20 text-[#E5A93C] border border-yellow-500/40'
+                              : 'bg-[#004A31] text-[#4EDEA3] border border-[#4EDEA3]/30'
+                              }`}>
+                              {a.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {isActive ? (
+                              <button
+                                onClick={() => ackMutation.mutate(a.alert_id)}
+                                disabled={ackMutation.isPending}
+                                className="px-2.5 py-1 bg-[#E5A93C] hover:bg-[#ffbd4a] text-[#261e05] font-bold rounded text-[10px] transition-colors cursor-pointer"
+                              >
+                                Acknowledge
+                              </button>
+                            ) : (
+                              <span className="text-[#4EDEA3] text-[11px] font-mono">
+                                Ack by {a.acknowledged_by || 'Operator'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

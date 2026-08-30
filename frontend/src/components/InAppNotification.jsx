@@ -42,6 +42,8 @@ export default function InAppNotification() {
   if (!latestAlert) return null;
 
   const isFire = latestAlert.alert_type?.toLowerCase() === 'fire';
+  const isWeapon = latestAlert.alert_type?.toLowerCase() === 'weapon';
+  const alertTitle = isFire ? 'Critical Fire Alert' : isWeapon ? 'Critical Weapon Threat' : 'Security Alert';
 
   return (
     <div className="fixed top-6 right-8 z-50 max-w-[420px] w-full animate-in slide-in-from-top-4 fade-in duration-300">
@@ -71,7 +73,7 @@ export default function InAppNotification() {
                 <span className={`font-space font-bold text-[13px] uppercase tracking-wider ${
                   isFire ? 'text-[#EE7D77]' : 'text-[#E5A93C]'
                 }`}>
-                  {isFire ? 'Critical Fire Alert' : 'Security Alert'}
+                  {alertTitle}
                 </span>
                 <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
               </div>

@@ -390,6 +390,7 @@ async def video_stream(camera_id: str, request: Request, db=Depends(get_db)):
 async def generate_simple_file_frames(video_path, request: Request, stop_event: asyncio.Event, camera_id: str = None):
     cap = await asyncio.to_thread(cv2.VideoCapture, video_path)
     from app.services.fire_detection import security_cache
+    from app.services.weapon_detection import weapon_cache
 
     try:
         if not cap.isOpened():
@@ -422,20 +423,39 @@ async def generate_simple_file_frames(video_path, request: Request, stop_event: 
             display_h = int(h * (display_w / w)) if w > 0 else 450
             frame = cv2.resize(frame, (display_w, display_h))
             
-            # Check security state for live fire/threat detection visual overlay
+            # Check security states for live threat detection visual overlays
             if camera_id:
-                state = security_cache.get_camera_state(camera_id)
-                if state and state.get("fire_detected"):
-                    scale_x = display_w / w if w > 0 else 1.0
-                    scale_y = display_h / h if h > 0 else 1.0
-                    for box in state.get("boxes", []):
+                scale_x = display_w / w if w > 0 else 1.0
+                scale_y = display_h / h if h > 0 else 1.0
+
+                # 1. Fire Detection Overlay
+                fire_state = security_cache.get_camera_state(camera_id)
+                if fire_state and fire_state.get("fire_detected"):
+                    for box in fire_state.get("boxes", []):
                         bx1, by1, bx2, by2 = int(box[0] * scale_x), int(box[1] * scale_y), int(box[2] * scale_x), int(box[3] * scale_y)
                         cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 69, 255), 2)
                         cv2.putText(frame, "FIRE DETECTED", (bx1, max(18, by1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 69, 255), 2)
 
-                    if state.get("is_active_alert"):
-                        cv2.rectangle(frame, (display_w - 200, 15), (display_w - 20, 50), (0, 0, 180), -1)
-                        cv2.putText(frame, "CRITICAL ALERT", (display_w - 190, 38), cv2.FONT_HERSHEY_DUPLEX, 0.6, (255, 255, 255), 1)
+                    if fire_state.get("is_active_alert"):
+                        cv2.rectangle(frame, (display_w - 220, 15), (display_w - 20, 50), (0, 0, 180), -1)
+                        cv2.putText(frame, "CRITICAL FIRE ALERT", (display_w - 210, 38), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+
+                # 2. Weapon Detection Overlay
+                weapon_state = weapon_cache.get_camera_state(camera_id)
+                if weapon_state and weapon_state.get("weapon_detected"):
+                    threat_cls = weapon_state.get("threat_class", "Gun").upper()
+                    conf_pct = int(weapon_state.get("confidence", 0.0) * 100)
+                    for box in weapon_state.get("boxes", []):
+                        bx1, by1, bx2, by2 = int(box[0] * scale_x), int(box[1] * scale_y), int(box[2] * scale_x), int(box[3] * scale_y)
+                        # Amber / Gold bounding box for weapons (BGR: 0, 165, 255)
+                        cv2.rectangle(frame, (bx1, by1), (bx2, by2), (0, 165, 255), 2)
+                        label_txt = f"WEAPON: {threat_cls} ({conf_pct}%)" if conf_pct > 0 else f"WEAPON: {threat_cls}"
+                        cv2.putText(frame, label_txt, (bx1, max(18, by1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+
+                    if weapon_state.get("is_active_alert"):
+                        top_offset = 55 if (fire_state and fire_state.get("is_active_alert")) else 15
+                        cv2.rectangle(frame, (display_w - 245, top_offset), (display_w - 20, top_offset + 35), (0, 140, 255), -1)
+                        cv2.putText(frame, "CRITICAL WEAPON ALERT", (display_w - 235, top_offset + 23), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
 
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:

@@ -156,12 +156,14 @@ class VideoIngestionWorker:
         capture_factory: Callable[[str | int], Any] | None = None,
         logger: logging.Logger | None = None,
         queue_timeout_seconds: float = 0.25,
+        broadcast_fn: Callable[[dict[str, Any]], None] | None = None,
     ) -> None:
         self.camera = camera
         self.raw_frame_queue = raw_frame_queue
         self.capture_factory = capture_factory or self._opencv_capture
         self.log = logger or LOG
         self.queue_timeout_seconds = queue_timeout_seconds
+        self.broadcast_fn = broadcast_fn
 
     @staticmethod
     def _opencv_capture(source: str | int) -> Any:
@@ -264,6 +266,11 @@ class VideoIngestionWorker:
         }
 
     def _put(self, payload: dict[str, Any]) -> None:
+        if self.broadcast_fn is not None:
+            self.broadcast_fn(payload)
+            self.log.debug("Frame broadcasted: camera=%s frame=%s", self.camera.camera_id, payload["frame_number"])
+            return
+
         try:
             self.raw_frame_queue.put(payload, timeout=self.queue_timeout_seconds)
             self.log.debug("Frame pushed to raw queue: camera=%s frame=%s", self.camera.camera_id, payload["frame_number"])

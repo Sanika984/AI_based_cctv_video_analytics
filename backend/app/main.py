@@ -29,15 +29,25 @@ async def lifespan(app: FastAPI):
                 loop_file=True
             )
             ingestion_manager.start_camera(cfg)
-        # Start Fire Detection Inference Worker consuming from raw_frame_queue
+        # Start Fire Detection Inference Worker consuming from dedicated subscription queue
         from app.services.fire_detection import fire_inference_manager
-        fire_inference_manager.start(ingestion_manager.get_queue())
+        fire_inference_manager.start(ingestion_manager.subscribe())
+
+        # Start Weapon Detection Inference Worker consuming from dedicated subscription queue
+        from app.services.weapon_detection import weapon_inference_manager
+        weapon_inference_manager.start(ingestion_manager.subscribe())
     except Exception as e:
         print(f"Startup camera ingestion/inference worker initialization error: {e}")
         
     yield
     
     # Shutdown: Stop all workers
+    try:
+        from app.services.weapon_detection import weapon_inference_manager
+        weapon_inference_manager.stop()
+    except Exception:
+        pass
+
     try:
         from app.services.fire_detection import fire_inference_manager
         fire_inference_manager.stop()

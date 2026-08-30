@@ -188,6 +188,35 @@ def acknowledge_alert(
 @router.get("/security/status")
 def get_security_status():
     from app.services.fire_detection import security_cache
-    return security_cache.get_all_states()
+    from app.services.weapon_detection import weapon_cache
+
+    fire_states = security_cache.get_all_states()
+    weapon_states = weapon_cache.get_all_states()
+
+    all_cids = set(fire_states.keys()) | set(weapon_states.keys())
+    merged = {}
+    for cid in all_cids:
+        f_state = fire_states.get(cid, {})
+        w_state = weapon_states.get(cid, {})
+
+        fire_detected = bool(f_state.get("fire_detected", False))
+        weapon_detected = bool(w_state.get("weapon_detected", False))
+        is_active_alert = bool(f_state.get("is_active_alert", False) or w_state.get("is_active_alert", False))
+
+        merged[cid] = {
+            "camera_id": cid,
+            "fire_detected": fire_detected,
+            "fire_confidence": f_state.get("confidence", 0.0),
+            "fire_boxes": f_state.get("boxes", []),
+            "weapon_detected": weapon_detected,
+            "weapon_confidence": w_state.get("confidence", 0.0),
+            "threat_class": w_state.get("threat_class", "Gun"),
+            "weapon_boxes": w_state.get("boxes", []),
+            "boxes": (f_state.get("boxes", []) or []) + (w_state.get("boxes", []) or []),
+            "threat_detected": fire_detected or weapon_detected,
+            "is_active_alert": is_active_alert,
+            "last_updated": max(f_state.get("last_updated", 0), w_state.get("last_updated", 0))
+        }
+    return merged
 
 
