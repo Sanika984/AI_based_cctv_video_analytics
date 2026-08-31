@@ -209,5 +209,40 @@ export const getSecurityStatus = async () => {
   }
 };
 
+// License Plate & Vehicle Analytics Endpoints
+export const getVehicleLogs = async (params = {}) => {
+  const { data } = await api.get('/analytics/vehicles/logs', { params });
+  return data;
+};
+
+export const getVehicleStats = async () => {
+  const { data } = await api.get('/analytics/vehicles/stats');
+  return data;
+};
+
+export const getLicensePlateStatus = async () => {
+  try {
+    const { data } = await api.get('/analytics/license-plate/status');
+    return data;
+  } catch (err) {
+    return {};
+  }
+};
+
+export const getBlacklistedVehicles = async () => {
+  const { data } = await api.get('/blacklisted-vehicles');
+  return data;
+};
+
+export const createBlacklistedVehicle = async (payload) => {
+  const { data } = await api.post('/blacklisted-vehicles', payload);
+  return data;
+};
+
+export const deleteBlacklistedVehicle = async (vehicleId) => {
+  const { data } = await api.delete(`/blacklisted-vehicles/${vehicleId}`);
+  return data;
+};
+
 export default api;
 

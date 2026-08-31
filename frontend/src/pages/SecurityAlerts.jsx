@@ -128,50 +128,10 @@ export default function SecurityAlerts() {
 
       {/* KPI Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-        {/* Fire Threat Status */}
-        <div className={`rounded-lg p-5 flex flex-col justify-between border transition-all ${activeFireAlerts.length > 0 || hasLiveFire
-          ? 'bg-[#2b0808]/80 border-[#EE7D77] shadow-[0_0_20px_rgba(238,125,119,0.25)]'
-          : 'bg-[#06122D] border-[rgba(43,70,128,0.15)]'
-          }`}>
-          <div className="flex justify-between items-center">
-            <span className="text-[#91AAEB] font-inter font-semibold text-[11px] uppercase tracking-wider">Fire Threat Level</span>
-            <Flame size={18} className={activeFireAlerts.length > 0 || hasLiveFire ? 'text-[#EE7D77] animate-bounce' : 'text-[#4EDEA3]'} />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className={`font-space font-bold text-[24px] uppercase ${activeFireAlerts.length > 0 || hasLiveFire ? 'text-[#EE7D77]' : 'text-[#4EDEA3]'
-              }`}>
-              {activeFireAlerts.length > 0 || hasLiveFire ? 'CRITICAL FLAME' : 'ALL CLEAR'}
-            </span>
-          </div>
-          <span className="text-[#91AAEB] font-inter text-[11px] mt-1">
-            {activeFireAlerts.length} active incident(s)
-          </span>
-        </div>
-
-        {/* Weapon Threat Status */}
-        <div className={`rounded-lg p-5 flex flex-col justify-between border transition-all ${activeWeaponAlerts.length > 0
-          ? 'bg-[#261e05]/80 border-[#E5A93C] shadow-[0_0_20px_rgba(229,169,60,0.25)]'
-          : 'bg-[#06122D] border-[rgba(43,70,128,0.15)]'
-          }`}>
-          <div className="flex justify-between items-center">
-            <span className="text-[#91AAEB] font-inter font-semibold text-[11px] uppercase tracking-wider">Perimeter Weapon Threat</span>
-            <ShieldAlert size={18} className={activeWeaponAlerts.length > 0 ? 'text-[#E5A93C] animate-bounce' : 'text-[#4EDEA3]'} />
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className={`font-space font-bold text-[24px] uppercase ${activeWeaponAlerts.length > 0 ? 'text-[#E5A93C]' : 'text-[#4EDEA3]'
-              }`}>
-              {activeWeaponAlerts.length > 0 ? 'THREAT DETECTED' : 'NORMAL'}
-            </span>
-          </div>
-          <span className="text-[#91AAEB] font-inter text-[11px] mt-1">
-            {activeWeaponAlerts.length} active incident(s)
-          </span>
-        </div>
-
         {/* Total Active Alerts */}
         <div className="bg-[#06122D] rounded-lg p-5 flex flex-col justify-between border border-[rgba(43,70,128,0.15)]">
           <div className="flex justify-between items-center">
-            <span className="text-[#91AAEB] font-inter font-semibold text-[11px] uppercase tracking-wider">Active Unresolved</span>
+            <span className="text-[#91AAEB] font-inter font-semibold text-[11px] uppercase tracking-wider">Active Alerts</span>
             <AlertTriangle size={18} className={totalActive > 0 ? 'text-[#EE7D77]' : 'text-[#91AAEB]'} />
           </div>
           <div className="mt-3">
@@ -192,7 +152,6 @@ export default function SecurityAlerts() {
               {fireCameras.length + weaponCameras.length}
             </span>
           </div>
-          <span className="text-[#4EDEA3] font-inter text-[11px] mt-1">AI Inference Workers Active</span>
         </div>
       </div>
 
@@ -272,7 +231,6 @@ export default function SecurityAlerts() {
                   <tr className="bg-[#06122D] text-[#91AAEB] border-b border-[rgba(43,70,128,0.15)] uppercase text-[10px] tracking-wider">
                     <th className="py-2.5 px-3">Alert ID</th>
                     <th className="py-2.5 px-3">Camera / Area</th>
-                    <th className="py-2.5 px-3">Severity</th>
                     <th className="py-2.5 px-3">Time</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Action</th>
@@ -281,7 +239,7 @@ export default function SecurityAlerts() {
                 <tbody className="divide-y divide-[rgba(43,70,128,0.08)]">
                   {fireAlerts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-6 text-[#91AAEB]/60 italic">
+                      <td colSpan={5} className="text-center py-6 text-[#91AAEB]/60 italic">
                         No fire detection incidents recorded.
                       </td>
                     </tr>
@@ -298,11 +256,6 @@ export default function SecurityAlerts() {
                               <span className="font-semibold text-[#DEE5FF]">{a.camera_name}</span>
                               <span className="text-[#91AAEB] text-[11px]">{a.location}</span>
                             </div>
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-red-500/20 text-[#EE7D77] border border-red-500/30">
-                              {a.severity}
-                            </span>
                           </td>
                           <td className="py-2.5 px-3 text-[#91AAEB] font-mono text-[11px]">
                             {a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '-'}
@@ -351,7 +304,7 @@ export default function SecurityAlerts() {
               </div>
               <div>
                 <h3 className="text-[#DEE5FF] font-space font-bold text-[18px] uppercase tracking-wide">
-                  Armed Threat & Weapon Detection
+                  Weapon Detection
                 </h3>
               </div>
             </div>
@@ -371,7 +324,7 @@ export default function SecurityAlerts() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-h-[220px]">
             {isLoadingCameras ? (
               <div className="col-span-2 flex items-center justify-center py-12 text-[#91AAEB]">
-                Loading weapon detection feeds...
+                Loading...
               </div>
             ) : weaponCameras.length > 0 ? (
               weaponCameras.map((cam) => (
@@ -394,10 +347,7 @@ export default function SecurityAlerts() {
               <div className="col-span-2 flex flex-col items-center justify-center py-10 px-4 bg-[#06122D]/60 border border-dashed border-[rgba(43,70,128,0.25)] rounded-lg text-center gap-3">
                 <Shield size={32} className="text-[#91AAEB]/40" />
                 <span className="text-[#DEE5FF] font-inter font-semibold text-[14px]">
-                  No cameras configured for Weapon Detection
-                </span>
-                <span className="text-[#91AAEB] font-inter text-[12px] max-w-[360px]">
-                  Enable &apos;Weapon detection&apos; under Security analytics in Camera Management to start monitoring armed threats.
+                  No cameras
                 </span>
               </div>
             )}
@@ -420,8 +370,6 @@ export default function SecurityAlerts() {
                   <tr className="bg-[#06122D] text-[#91AAEB] border-b border-[rgba(43,70,128,0.15)] uppercase text-[10px] tracking-wider">
                     <th className="py-2.5 px-3">Alert ID</th>
                     <th className="py-2.5 px-3">Camera / Area</th>
-                    <th className="py-2.5 px-3">Details</th>
-                    <th className="py-2.5 px-3">Severity</th>
                     <th className="py-2.5 px-3">Time</th>
                     <th className="py-2.5 px-3">Status</th>
                     <th className="py-2.5 px-3 text-right">Action</th>
@@ -430,8 +378,8 @@ export default function SecurityAlerts() {
                 <tbody className="divide-y divide-[rgba(43,70,128,0.08)]">
                   {weaponAlerts.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-6 text-[#91AAEB]/60 italic">
-                        No weapon detection incidents recorded.
+                      <td colSpan={5} className="text-center py-6 text-[#91AAEB]/60 italic">
+                        No incidents recorded.
                       </td>
                     </tr>
                   ) : (
@@ -447,14 +395,6 @@ export default function SecurityAlerts() {
                               <span className="font-semibold text-[#DEE5FF]">{a.camera_name}</span>
                               <span className="text-[#91AAEB] text-[11px]">{a.location}</span>
                             </div>
-                          </td>
-                          <td className="py-2.5 px-3 text-[#91AAEB] font-mono text-[11px] max-w-[180px] truncate">
-                            {a.reference_id || 'Armed Threat'}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-yellow-500/20 text-[#E5A93C] border border-yellow-500/30">
-                              {a.severity}
-                            </span>
                           </td>
                           <td className="py-2.5 px-3 text-[#91AAEB] font-mono text-[11px]">
                             {a.timestamp ? new Date(a.timestamp).toLocaleTimeString() : '-'}

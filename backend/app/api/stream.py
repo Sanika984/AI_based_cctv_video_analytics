@@ -391,6 +391,7 @@ async def generate_simple_file_frames(video_path, request: Request, stop_event: 
     cap = await asyncio.to_thread(cv2.VideoCapture, video_path)
     from app.services.fire_detection import security_cache
     from app.services.weapon_detection import weapon_cache
+    from app.services.license_plate_detection import license_plate_cache
 
     try:
         if not cap.isOpened():
@@ -456,6 +457,28 @@ async def generate_simple_file_frames(video_path, request: Request, stop_event: 
                         top_offset = 55 if (fire_state and fire_state.get("is_active_alert")) else 15
                         cv2.rectangle(frame, (display_w - 245, top_offset), (display_w - 20, top_offset + 35), (0, 140, 255), -1)
                         cv2.putText(frame, "CRITICAL WEAPON ALERT", (display_w - 235, top_offset + 23), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
+
+                # 3. License Plate Detection Overlay
+                lpd_state = license_plate_cache.get_camera_state(camera_id)
+                if lpd_state and lpd_state.get("plate_detected"):
+                    plate_txt = lpd_state.get("plate_number") or "PLATE"
+                    is_bl = lpd_state.get("is_blacklisted", False)
+                    conf_pct = int(lpd_state.get("confidence", 0.0) * 100)
+                    box_color = (0, 0, 255) if is_bl else (78, 222, 163) # Red if blacklisted, emerald if normal
+                    
+                    for box in lpd_state.get("boxes", []):
+                        bx1, by1, bx2, by2 = int(box[0] * scale_x), int(box[1] * scale_y), int(box[2] * scale_x), int(box[3] * scale_y)
+                        cv2.rectangle(frame, (bx1, by1), (bx2, by2), box_color, 2)
+                        
+                        # Label background
+                        lbl = f"{'[BLACKLIST] ' if is_bl else ''}{plate_txt} ({conf_pct}%)" if conf_pct > 0 else plate_txt
+                        (tw, th), _ = cv2.getTextSize(lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                        cv2.rectangle(frame, (bx1, max(0, by1 - 22)), (bx1 + tw + 10, max(20, by1)), (0, 20, 50), -1)
+                        cv2.putText(frame, lbl, (bx1 + 5, max(15, by1 - 6)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, box_color, 1)
+
+                    if is_bl:
+                        cv2.rectangle(frame, (display_w - 265, 15), (display_w - 20, 50), (0, 0, 200), -1)
+                        cv2.putText(frame, "BLACKLIST DETECTED", (display_w - 255, 38), cv2.FONT_HERSHEY_DUPLEX, 0.5, (255, 255, 255), 1)
 
             ret, buffer = cv2.imencode('.jpg', frame)
             if not ret:

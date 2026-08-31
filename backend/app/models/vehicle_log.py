@@ -16,5 +16,6 @@ class VehicleLog(Base):
 
     confidence_score = Column(Float)
     is_blacklisted = Column(Boolean, nullable=False, default=False)
+    snapshot_url = Column(Text, nullable=True)
 
     camera = relationship("Camera", back_populates="vehicle_logs")

@@ -220,3 +220,77 @@ def get_security_status():
     return merged
 
 
+# ==========================================
+# VEHICLE & LICENSE PLATE DETECTION ANALYTICS
+# ==========================================
+
+@router.get("/vehicles/logs")
+def get_vehicle_logs(
+    camera_id: str = None,
+    plate_number: str = None,
+    is_blacklisted: bool = None,
+    limit: int = 50,
+    db=Depends(get_db)
+):
+    from app.models.vehicle_log import VehicleLog
+    from app.models.camera import Camera
+
+    query = db.query(VehicleLog, Camera).outerjoin(Camera, VehicleLog.camera_id == Camera.camera_id)
+
+    if camera_id and camera_id != "all":
+        query = query.filter(VehicleLog.camera_id == camera_id)
+    if plate_number:
+        query = query.filter(VehicleLog.plate_number.ilike(f"%{plate_number}%"))
+    if is_blacklisted is not None:
+        query = query.filter(VehicleLog.is_blacklisted == is_blacklisted)
+
+    results = query.order_by(VehicleLog.entry_time.desc()).limit(limit).all()
+
+    # Rule: If confidence < 70% (0.70) or plate text is not confident, return '-' so UI and operators rely on snapshot
+    return [
+        {
+            "log_id": log.log_id,
+            "camera_id": log.camera_id,
+            "camera_name": camera.name if camera else log.camera_id,
+            "location": camera.location if camera else "Gate / Entrance",
+            "plate_number": (
+                log.plate_number
+                if (log.plate_number and log.plate_number != "-" and (log.confidence_score or 0.0) >= 0.70)
+                else "-"
+            ),
+            "entry_time": log.entry_time.isoformat() if log.entry_time else None,
+            "exit_time": log.exit_time.isoformat() if log.exit_time else None,
+            "confidence_score": round(log.confidence_score or 0.0, 2),
+            "is_blacklisted": log.is_blacklisted if ((log.confidence_score or 0.0) >= 0.70 and log.plate_number and log.plate_number != "-") else False,
+            "snapshot_url": log.snapshot_url,
+        }
+        for log, camera in results
+    ]
+
+
+@router.get("/vehicles/stats")
+def get_vehicle_stats(db=Depends(get_db)):
+    from app.models.vehicle_log import VehicleLog
+
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    vehicles_today = db.query(func.count(VehicleLog.log_id)).filter(VehicleLog.entry_time >= today).scalar() or 0
+    total_vehicles = db.query(func.count(VehicleLog.log_id)).scalar() or 0
+    blacklist_count = db.query(func.count(VehicleLog.log_id)).filter(
+        VehicleLog.is_blacklisted == True
+    ).scalar() or 0
+
+    return {
+        "total_plates_detected": total_vehicles,
+        "blacklist_count": blacklist_count,
+        "vehicles_today": vehicles_today,
+        "total_vehicles": total_vehicles,
+    }
+
+
+@router.get("/license-plate/status")
+def get_license_plate_status():
+    from app.services.license_plate_detection import license_plate_cache
+    return license_plate_cache.get_all_states()
+
+

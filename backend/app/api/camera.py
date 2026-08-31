@@ -144,6 +144,9 @@ def create_camera(
             from app.services.video_ingestion import ingestion_manager, CameraConfig
             clean_source = str(payload.sourceUrl).strip()
             source_type = "webcam" if clean_source.isdigit() else ("rtsp" if clean_source.startswith(("rtsp://", "http://", "https://")) else "file")
+            features = dict(payload.features or {})
+            if payload.module:
+                features[payload.module] = True
             cfg = CameraConfig(
                 camera_id=camera_id,
                 camera_name=payload.name,
@@ -151,7 +154,7 @@ def create_camera(
                 source_identifier=int(clean_source) if source_type == "webcam" else clean_source,
                 processing_fps=float(payload.processingFps or 5.0),
                 location=payload.zone,
-                enabled_features=payload.features or {},
+                enabled_features=features,
                 loop_file=True
             )
             ingestion_manager.start_camera(cfg)
@@ -211,6 +214,9 @@ def update_camera(
         if payload.status == "Online":
             clean_source = str(payload.sourceUrl).strip()
             source_type = "webcam" if clean_source.isdigit() else ("rtsp" if clean_source.startswith(("rtsp://", "http://", "https://")) else "file")
+            features = dict(payload.features or {})
+            if payload.module:
+                features[payload.module] = True
             cfg = CameraConfig(
                 camera_id=camera_id,
                 camera_name=payload.name,
@@ -218,7 +224,7 @@ def update_camera(
                 source_identifier=int(clean_source) if source_type == "webcam" else clean_source,
                 processing_fps=float(payload.processingFps or 5.0),
                 location=payload.zone,
-                enabled_features=payload.features or {},
+                enabled_features=features,
                 loop_file=True
             )
             ingestion_manager.start_camera(cfg)
